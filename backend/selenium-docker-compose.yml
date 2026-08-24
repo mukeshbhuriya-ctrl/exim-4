@@ -1,0 +1,91 @@
+version: "3"
+services:
+
+
+  selenium-hub:
+    image: selenium/hub
+    container_name: hub
+    ports:
+      - "4444:4444"
+    networks:
+      - selenium-network
+
+
+
+  chrome-node-1:
+    image: selenium/node-chrome:4.19
+    container_name: chrome-node-1
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      - SE_VNC_NO_PASSWORD=1
+      - SE_NODE_MAX_SESSIONS=10     
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+    shm_size: 2gb
+    networks:
+      - selenium-network
+  
+  chrome-node-2:
+    image: selenium/node-chrome:4.19
+    container_name: chrome-node-2
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      - SE_VNC_NO_PASSWORD=1
+      - SE_NODE_MAX_SESSIONS=10        
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+    shm_size: 2gb
+    networks:
+      - selenium-network
+
+  chrome-node-3:
+    image: selenium/node-chrome:4.19    
+    container_name: chrome-node-3
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      - SE_VNC_NO_PASSWORD=1
+      - SE_NODE_MAX_SESSIONS=10        
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+    shm_size: 2gb
+    networks:
+      - selenium-network
+
+  chrome-node-4:
+    image: selenium/node-chrome:4.19    
+    container_name: chrome-node-4
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      - SE_VNC_NO_PASSWORD=1
+      - SE_NODE_MAX_SESSIONS=10        
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+    shm_size: 2gb
+    networks:
+      - selenium-network
+
+
+      
+networks:
+  selenium-network:
+    driver: bridge
+
+
+# docker run -d --name selenium-node-4 --network shippingbill_selenium-network -e SE_EVENT_BUS_HOST=selenium-hub -e SE_EVENT_BUS_PUBLISH_PORT=4442 -e SE_EVENT_BUS_SUBSCRIBE_PORT=4443 -e SE_VNC_NO_PASSWORD=1 -e SE_NODE_MAX_SESSIONS=20 -e SE_NODE_OVERRIDE_MAX_SESSIONS=true  selenium/node-chrome:4.19
+
+
+# wget https://raw.githubusercontent.com/sharp-and-tannan/steup/refs/heads/main/selenium-docker-compose.yml
+# docker compose -f selenium-docker-compose.yml up -d
+

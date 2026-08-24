@@ -1,0 +1,145 @@
+# =========================================================
+# Dependencies
+# =========================================================
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/
+.yarn-cache/
+
+# =========================================================
+# Environment / Secrets
+# =========================================================
+.env
+.env.*
+!.env.example
+!.env.sample
+
+# Backend secrets / credentials
+backend/client_secret.json
+backend/token.json
+
+# Generic credential files
+**/*credentials*.json
+**/*credential*.json
+**/*secret*.json
+**/*secrets*.json
+
+# Private keys / certificates
+*.pem
+*.key
+*.p12
+*.pfx
+
+# =========================================================
+# Logs
+# =========================================================
+*.log
+logs/
+log/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================================================
+# Frontend build output
+# =========================================================
+frontend-2/dist/
+frontend-2/build/
+frontend-2/.vite/
+
+scripts/*xlsx
+mail_move.js
+remove_debulicat.js
+
+# =========================================================
+# Backend generated / temporary files
+# =========================================================
+backend/tmp/
+backend/temp/
+backend/uploads/
+backend/output/
+backend/outputs/
+
+# =========================================================
+# Python / PDF / OCR temporary files
+# =========================================================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# =========================================================
+# Coverage
+# =========================================================
+coverage/
+.nyc_output/
+
+# =========================================================
+# Cache
+# =========================================================
+.cache/
+.parcel-cache/
+.eslintcache
+*.tsbuildinfo
+
+# =========================================================
+# OS files
+# =========================================================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# =========================================================
+# Editor / IDE
+# =========================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Keep VS Code project settings only if you intentionally
+# want to share them. If so, remove the .vscode/ rule above.
+
+# =========================================================
+# Temporary files
+# =========================================================
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# =========================================================
+# Selenium / browser artifacts
+# =========================================================
+screenshots/
+backend/screenshots/
+downloads/
+backend/downloads/
+
+# =========================================================
+# Docker local overrides
+# =========================================================
+docker-compose.override.yml
+
+# =========================================================
+# Frontend environment files
+# =========================================================
+frontend-2/.env
+frontend-2/.env.*
+!frontend-2/.env.example
+!frontend-2/.env.sample
+
+# =========================================================
+# Backend environment files
+# =========================================================
+backend/.env
+backend/.env.*
+!backend/.env.example
+!backend/.env.sample

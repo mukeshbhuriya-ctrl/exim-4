@@ -1,0 +1,231 @@
+{
+    "_id": {
+      "$oid": "6a0c3cadb3cc5230fd2a25d0"
+    },
+    "companyId": {
+      "$oid": "6a02df12fbb8a88dabdcb7f6"
+    },
+    "__v": 0,
+    "createdAt": {
+      "$date": "2026-05-19T10:34:21.705Z"
+    },
+    "defaultFirstRow": {
+      "INDICATOR": "H",
+      "DOCUMENT_DATE": "current_date",
+      "COMPANY_CODE": "GRRP",
+      "POSTING_DATE": "current_date",
+      "DOC_TYPE": "YU",
+      "CURRENCY": "INR",
+      "EXCHANGE_RATE": "",
+      "REFERENCE": "DRBK",
+      "HEADER_TEXT": "",
+      "POSTING_KEY": "",
+      "ACCOUNT_NO": "",
+      "SPLGL_INDICATROR": "",
+      "Asset Transaction type": "",
+      "SAL_AMOUNT": "",
+      "ASSIGNMENT": "",
+      "SHORT_TEXT": "",
+      "COST_CENTER": "",
+      "PROFITCENTER": "",
+      "PLANT": "",
+      "BUSINESS_PLACE": "",
+      "SECTION_CODE": "",
+      "BUSINESS_AREA": "",
+      "BASELINE_DATE": "",
+      "REF_FILED1": "",
+      "REF_FILED2": "",
+      "REF_FILED3": ""
+    },
+    "headerMappings": [
+      {
+        "headerName": "INDICATOR",
+        "headerValueType": "default_value",
+        "renameHeader": "",
+        "defaultValue": "I",
+        "seq": 1
+      },
+      {
+        "headerName": "DOCUMENT_DATE",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 2
+      },
+      {
+        "headerName": "COMPANY_CODE",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 3
+      },
+      {
+        "headerName": "POSTING_DATE",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 4
+      },
+      {
+        "headerName": "DOC_TYPE",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 5
+      },
+      {
+        "headerName": "CURRENCY",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 6
+      },
+      {
+        "headerName": "EXCHANGE_RATE",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 7
+      },
+      {
+        "headerName": "REFERENCE",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 8
+      },
+      {
+        "headerName": "HEADER_TEXT",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 9
+      },
+      {
+        "headerName": "POSTING_KEY",
+        "headerValueType": "auto-added",
+        "renameHeader": "",
+        "seq": 10
+      },
+      {
+        "headerName": "ACCOUNT_NO",
+        "headerValueType": "auto-added",
+        "renameHeader": "",
+        "seq": 11
+      },
+      {
+        "headerName": "SPLGL_INDICATROR",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 12
+      },
+      {
+        "headerName": "Asset Transaction type",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 13
+      },
+      {
+        "headerName": "SAL_AMOUNT",
+        "headerValueType": "auto-added",
+        "renameHeader": "",
+        "seq": 14
+      },
+      {
+        "headerName": "ASSIGNMENT",
+        "headerValueType": "auto-added",
+        "renameHeader": "",
+        "seq": 15
+      },
+      {
+        "headerName": "SHORT_TEXT",
+        "headerValueType": "auto-added",
+        "renameHeader": "",
+        "seq": 16
+      },
+      {
+        "headerName": "COST_CENTER",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 17
+      },
+      {
+        "headerName": "PROFITCENTER",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 18
+      },
+      {
+        "headerName": "PLANT",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 19
+      },
+      {
+        "headerName": "BUSINESS_PLACE",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 20
+      },
+      {
+        "headerName": "SECTION_CODE",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 21
+      },
+      {
+        "headerName": "BUSINESS_AREA",
+        "headerValueType": "auto-added",
+        "renameHeader": "",
+        "seq": 22
+      },
+      {
+        "headerName": "BASELINE_DATE",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 23
+      },
+      {
+        "headerName": "REF_FILED1",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 24
+      },
+      {
+        "headerName": "REF_FILED2",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 25
+      },
+      {
+        "headerName": "REF_FILED3",
+        "headerValueType": "blank_default_value",
+        "renameHeader": "",
+        "defaultValue": "",
+        "seq": 26
+      }
+    ],
+    "postingAccounts": [
+      {
+        "POSTING_KEY": "40",
+        "ACCOUNT_NO": "2500004"
+      },
+      {
+        "POSTING_KEY": "50",
+        "ACCOUNT_NO": "3100002"
+      }
+    ],
+    "updatedAt": {
+      "$date": "2026-06-22T12:09:52.354Z"
+    }
+  }

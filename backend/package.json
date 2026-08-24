@@ -1,0 +1,49 @@
+{
+  "name": "backend2",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "gmail-otp-smoke": "node scripts/gmail-otp-smoke.js",
+    "gmail-oauth-creds": "node scripts/gmail-oauth-credentials-smoke.js",
+    "automation": "node automation/automation.js",
+    "automation:cron": "node automation/cron.js",
+    "dedupe-shippingbillno": "node scripts/dedupe-shippingbillno.js",
+    "dedupe-dgftprocess": "node scripts/dedupe-dgftprocess.js",
+    "dedupe-sbonline": "node scripts/dedupe-sbonline.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1029.0",
+    "@azure/msal-node": "^5.2.5",
+    "@kenjiuno/msgreader": "^1.28.0",
+    "dotenv": "^17.3.1",
+    "exceljs": "^4.4.0",
+    "express": "^5.2.1",
+    "google-auth-library": "^10.6.2",
+    "jsonwebtoken": "^9.0.3",
+    "mailparser": "^3.9.12",
+    "mongoose": "^9.3.2",
+    "multer": "^2.1.1",
+    "node-cron": "^4.6.0",
+    "node-fetch": "^2.6.9",
+    "nodemailer": "^8.0.3",
+    "nodemon": "^3.1.14",
+    "pdf-parse": "^2.4.5",
+    "prisma": "^7.5.0",
+    "selenium-webdriver": "^4.41.0",
+    "tesseract.js": "^7.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "imports": {
+    "#routes/*": "./routes/*.js",
+    "#utils/*": "./utils/*.js",
+    "#controllers/*": "./controllers/*.js",
+    "#fetch_utils/*": "./fetch_utils/*/index.js"
+  }
+}

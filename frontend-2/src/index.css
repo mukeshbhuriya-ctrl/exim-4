@@ -1,0 +1,237 @@
+/* ═══════════════════════════════════════════════════════════
+   EXIM Automation — Design System Tokens
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ─── Brand ─── */
+  --exim-primary:        #1B4DFF;
+  --exim-primary-hover:  #0037D5;
+  --exim-primary-light:  #EBF0FF;
+  --exim-primary-50:     #F0F4FF;
+  --exim-primary-100:    #DBE4FF;
+  --exim-primary-600:    #1B4DFF;
+  --exim-primary-700:    #0037D5;
+
+  /* ─── Neutrals ─── */
+  --exim-bg:             #F5F6FA;
+  --exim-surface:        #FFFFFF;
+  --exim-border:         #E5E7EB;
+  --exim-border-light:   #F0F1F3;
+  --exim-gray-50:        #F9FAFB;
+  --exim-gray-100:       #F3F4F6;
+  --exim-gray-200:       #E5E7EB;
+  --exim-gray-300:       #D1D5DB;
+  --exim-gray-400:       #9CA3AF;
+  --exim-gray-500:       #6B7280;
+  --exim-gray-600:       #4B5563;
+  --exim-gray-700:       #374151;
+  --exim-gray-800:       #1F2937;
+  --exim-gray-900:       #111827;
+
+  /* ─── Text ─── */
+  --exim-text-primary:   #111827;
+  --exim-text-secondary: #6B7280;
+  --exim-text-muted:     #9CA3AF;
+
+  /* ─── Status ─── */
+  --exim-success:        #059669;
+  --exim-success-light:  #ECFDF5;
+  --exim-warning:        #D97706;
+  --exim-warning-light:  #FFFBEB;
+  --exim-error:          #DC2626;
+  --exim-error-light:    #FEF2F2;
+  --exim-info:           #2563EB;
+  --exim-info-light:     #EFF6FF;
+
+  /* ─── Sidebar ─── */
+  --exim-sidebar-bg:     #0F172A;
+  --exim-sidebar-hover:  #1E293B;
+  --exim-sidebar-text:   #94A3B8;
+  --exim-sidebar-active: #1B4DFF;
+  --exim-sidebar-width:  260px;
+  --exim-sidebar-collapsed-width: 72px;
+
+  /* ─── Header ─── */
+  --exim-header-height:  56px;
+
+  /* ─── Typography ─── */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+
+  /* ─── Spacing ─── */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* ─── Radius ─── */
+  --radius-sm:  6px;
+  --radius-md:  8px;
+  --radius-lg:  12px;
+  --radius-xl:  16px;
+  --radius-2xl: 20px;
+
+  /* ─── Shadows ─── */
+  --shadow-xs:  0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md:  0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg:  0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-xl:  0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+
+  /* ─── Transitions ─── */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Reset & Base
+   ═══════════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--exim-text-primary);
+  background: var(--exim-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--exim-text-primary);
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  padding: 2px 6px;
+  background: var(--exim-gray-100);
+  border-radius: var(--radius-sm);
+  color: var(--exim-text-primary);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Scrollbar Styling
+   ═══════════════════════════════════════════════════════════ */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--exim-gray-300);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--exim-gray-400);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Ant Design Global Overrides
+   ═══════════════════════════════════════════════════════════ */
+
+/* Smoother table styling */
+.ant-table-wrapper .ant-table {
+  border-radius: var(--radius-lg) !important;
+}
+
+.ant-table-wrapper .ant-table-thead > tr > th {
+  font-weight: 600 !important;
+  font-size: 12px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  color: var(--exim-gray-500) !important;
+}
+
+/* Card refinements */
+.ant-card {
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-sm) !important;
+  border-color: var(--exim-border-light) !important;
+}
+
+/* Button micro-interaction */
+.ant-btn {
+  transition: all var(--transition-fast) !important;
+}
+
+.ant-btn-primary:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(27, 77, 255, 0.3);
+}
+
+/* Modal backdrop blur */
+.ant-modal-mask {
+  backdrop-filter: blur(4px);
+}
+
+/* Smooth modal entrance */
+.ant-modal {
+  animation-duration: 200ms !important;
+}
+
+/* Tag refinements */
+.ant-tag {
+  border-radius: var(--radius-sm) !important;
+  font-weight: 500 !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Utility Classes
+   ═══════════════════════════════════════════════════════════ */
+
+.exim-page-content {
+  padding: var(--space-6);
+  max-width: 100%;
+  min-width: 0;
+}
+
+.exim-fade-in {
+  animation: eximFadeIn var(--transition-slow) ease-out;
+}
+
+@keyframes eximFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Selection styling */
+::selection {
+  background: var(--exim-primary-100);
+  color: var(--exim-primary-700);
+}

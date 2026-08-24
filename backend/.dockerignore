@@ -1,0 +1,17 @@
+node_modules
+npm-debug.log*
+logs
+*.log
+.git
+.gitignore
+# Keep .env in the image so Node dotenv can load it at runtime.
+!.env
+!.env.example
+Dockerfile
+.dockerignore
+selenium-docker-compose.yml
+uploads
+tmp
+temp
+coverage
+.DS_Store
