@@ -1,9 +1,9 @@
-import { CloseOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, Layout, Space, Table, Typography, Upload, message } from 'antd'
+import { CloudUploadOutlined, CloseOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Button, Layout, Space, Table, Typography, Upload, message, Card } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
-import PageHeader from '../../../../components/common/PageHeader.jsx'
+import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -87,18 +87,17 @@ export default function CompanyAdminUploadPdfPage() {
   const [files, setFiles] = useState([])
   const [uploading, setUploading] = useState(false)
   const [downloadingExcel, setDownloadingExcel] = useState(false)
-  const [pdfDataRows, setPdfDataRows] = useState([])
+  const [currentView, setCurrentView] = useState('list') // 'list' | 'upload'
   const [pdfDataLoading, setPdfDataLoading] = useState(false)
-  const [pdfDataPage, setPdfDataPage] = useState(1)
-  const [pdfDataLimit, setPdfDataLimit] = useState(PDF_DATA_DEFAULT_LIMIT)
-  const [pdfDataTotal, setPdfDataTotal] = useState(0)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [dynamicColumns, setDynamicColumns] = useState([])
 
-  const fetchPdfData = useCallback(
-    async (page, limit) => {
-      if (!BACKEND_URL) return
+  const fetchData = useCallback(
+    async ({ page, limit }) => {
+      if (!BACKEND_URL) return { data: [], meta: { total: 0 } }
       const p = clampPdfDataPage(page)
       const l = clampPdfDataLimit(limit)
-      setPdfDataLoading(true)
+
       try {
         const params = new URLSearchParams({
           page: String(p),
@@ -113,41 +112,33 @@ export default function CompanyAdminUploadPdfPage() {
           throw new Error(data?.detail || data?.message || `Failed to load PDF data (${res.status})`)
         }
         const rows = normalizePdfDataRows(data).filter((r) => r && typeof r === 'object')
-        setPdfDataRows(rows)
+
+        // Update columns dynamically
+        setDynamicColumns(getTableColumnsFromRows(rows))
 
         let total = 0
         if (data.pagination && typeof data.pagination === 'object') {
-          const pg = data.pagination
-          setPdfDataPage(clampPdfDataPage(pg.page ?? p))
-          setPdfDataLimit(clampPdfDataLimit(pg.limit ?? l))
-          total = Number(pg.total)
+          total = Number(data.pagination.total)
         } else {
-          setPdfDataPage(p)
-          setPdfDataLimit(l)
-          const t = data.total ?? data.totalCount
-          total = Number(t)
+          total = Number(data.total ?? data.totalCount)
         }
-        if (!Number.isFinite(total)) {
-          total = rows.length
+        if (!Number.isFinite(total)) total = rows.length
+
+        return {
+          data: rows,
+          meta: {
+            total,
+            page: p,
+            totalPages: Math.ceil(total / l)
+          }
         }
-        setPdfDataTotal(total)
       } catch (err) {
         message.error(err instanceof Error ? err.message : 'Failed to load PDF data')
-        setPdfDataRows([])
-        setPdfDataTotal(0)
-      } finally {
-        setPdfDataLoading(false)
+        return { data: [], meta: { total: 0 } }
       }
     },
     [BACKEND_URL],
   )
-
-  useEffect(() => {
-    if (!BACKEND_URL) return
-    fetchPdfData(1, PDF_DATA_DEFAULT_LIMIT)
-  }, [BACKEND_URL, fetchPdfData])
-
-  const pdfDataColumns = useMemo(() => getTableColumnsFromRows(pdfDataRows), [pdfDataRows])
 
   const handleBeforeUpload = (file) => {
     const lowerName = String(file.name || '').toLowerCase()
@@ -212,7 +203,8 @@ export default function CompanyAdminUploadPdfPage() {
 
       message.success(data?.message || 'PDF files uploaded successfully')
       setFiles([])
-      fetchPdfData(1, pdfDataLimit)
+      setCurrentView('list') // Switch back to list view on success
+      setRefreshKey(prev => prev + 1)
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Failed to upload PDF files')
     } finally {
@@ -261,15 +253,33 @@ export default function CompanyAdminUploadPdfPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="middle" style={{ width: '100%', minWidth: 0 }}>
-            <div>
-              <Title level={3} style={{ margin: 0 }}>
-                Upload PDF
-              </Title>
-              <Text type="secondary">
-                Select PDF files, EML files, or Outlook MSG files (PDF attachments are extracted from mail).
-              </Text>
-            </div>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16 }}>
+        {/* Page Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <Title level={4} style={{ margin: 0, color: 'var(--exim-gray-900)' }}>
+              LEO Copy PDF
+            </Title>
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              Manage and process uploaded PDF documents.
+            </Text>
+          </div>
+          {currentView === 'upload' && (
+            <Button onClick={() => setCurrentView('list')} style={{ fontWeight: 500 }}>
+              Cancel & Back to List
+            </Button>
+          )}
+        </div>
+
+        {currentView === 'upload' ? (
+          /* Inline Flat Uploader View */
+          <div style={{ background: '#fff', border: '1px solid var(--exim-border-light)', padding: 32, borderRadius: 8, flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <Title level={4} style={{ marginTop: 0, marginBottom: 8, color: 'var(--exim-gray-800)' }}>
+              Upload Documents
+            </Title>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>
+              Select or drag and drop PDF files, EML files, or Outlook MSG files. Attachments will be automatically extracted.
+            </Text>
 
             <Upload.Dragger
               accept=".pdf,application/pdf,.eml,message/rfc822,.msg,application/vnd.ms-outlook"
@@ -278,152 +288,108 @@ export default function CompanyAdminUploadPdfPage() {
               onRemove={handleRemove}
               fileList={files}
               listType="text"
-              showUploadList={{ showPreviewIcon: false }}
-              styles={{
-                list: {
-                  display: 'flex',
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                  marginTop: 12,
-                },
-                item: {
-                  marginTop: 0,
-                  marginInlineEnd: 0,
-                  marginInlineStart: 0,
-                },
-              }}
-              itemRender={(_, file, __, { remove }) => (
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    boxSizing: 'border-box',
-                    maxWidth: 'min(100%, 280px)',
-                    padding: '4px 10px',
-                    background: '#fafafa',
-                    border: '1px solid #f0f0f0',
-                    borderRadius: 6,
-                    fontSize: 13,
-                  }}
-                >
-                  <span
-                    style={{
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      minWidth: 0,
-                      flex: 1,
-                    }}
-                    title={file.name}
-                  >
-                    {file.name}
-                  </span>
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<CloseOutlined />}
-                    aria-label={`Remove ${file.name}`}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      remove()
-                    }}
-                    style={{ flexShrink: 0, padding: '0 4px', height: 24 }}
-                  />
-                </div>
-              )}
-              style={{ padding: 16 }}
+              showUploadList={false}
+              style={{ padding: '40px 16px', background: '#f8fafc', borderColor: '#cbd5e1' }}
             >
-              <Title level={5} style={{ margin: 0 }}>
-                PDF / EML / MSG files
-              </Title>
-              <Text type="secondary">Drop PDF, .eml, or .msg files here</Text>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+                <CloudUploadOutlined style={{ fontSize: 48, color: 'var(--exim-primary)' }} />
+                <div style={{ textAlign: 'center' }}>
+                  <p className="ant-upload-text" style={{ fontSize: 16, fontWeight: 500, color: 'var(--exim-gray-800)', margin: 0 }}>
+                    Click or drag files to this area to upload
+                  </p>
+                  <p className="ant-upload-hint" style={{ fontSize: 13, color: 'var(--exim-gray-500)', marginTop: 8, marginBottom: 0 }}>
+                    Supports single or bulk upload of PDF, EML, or MSG files.
+                  </p>
+                </div>
+              </div>
             </Upload.Dragger>
 
-            <div style={{ minWidth: 0, width: '100%' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  flexWrap: 'wrap',
-                  marginBottom: 12,
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 10,
-                  background: '#fff',
-                  paddingTop: 8,
-                  paddingBottom: 8,
-                  marginInline: -24,
-                  paddingInline: 24,
-                  borderBottom: '1px solid #f0f0f0',
-                  boxShadow: '0 1px 0 rgba(0,0,0,0.04)',
-                }}
+            {files.length > 0 && (
+              <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--exim-border-light)', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <Text strong style={{ fontSize: 14, color: 'var(--exim-gray-800)', display: 'block', marginBottom: 12 }}>
+                  Selected Files ({files.length})
+                </Text>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, overflowY: 'auto' }} className="custom-scrollbar">
+                  {files.map(file => (
+                    <div
+                      key={file.uid}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '6px 12px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        fontSize: 13,
+                        borderRadius: 4,
+                      }}
+                    >
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }} title={file.name}>
+                        {file.name}
+                      </span>
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<CloseOutlined style={{ fontSize: 10 }} />}
+                        onClick={() => handleRemove(file)}
+                        style={{ height: 20, width: 20, minWidth: 20, padding: 0, color: 'var(--exim-gray-400)' }}
+                        className="hover-text-red-500 hover-bg-red-50"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--exim-border-light)', display: 'flex', justifyContent: 'flex-end', gap: 16 }}>
+              <Button onClick={clearFiles} disabled={uploading || !files.length} size="large">
+                Clear Selection
+              </Button>
+              <Button
+                type="primary"
+                icon={<CloudUploadOutlined />}
+                loading={uploading}
+                onClick={handleUpload}
+                disabled={!files.length}
+                size="large"
+                style={{ fontWeight: 600 }}
               >
-                <Title level={5} style={{ margin: 0 }}>
-                  PDF data
-                </Title>
-                <Space wrap>
-                  <Button type="primary" loading={uploading} onClick={handleUpload} disabled={uploading}>
-                    Upload PDF
-                  </Button>
-                  <Button onClick={clearFiles} disabled={uploading || !files.length}>
-                    Clear
-                  </Button>
+                Upload {files.length > 0 ? `${files.length} Files` : ''}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          /* Data Table View */
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <ProDataTable
+              columns={dynamicColumns}
+              fetchData={fetchData}
+              refreshKey={refreshKey}
+              onExport={handleDownloadPdfDataExcel}
+              rowKey={(_, index) => `pdf-data-${index}`}
+              globalSearchPlaceholder="Search PDF Data..."
+              customToolbarActions={
+                <Space>
                   <Button
-                    icon={<DownloadOutlined />}
-                    loading={downloadingExcel}
-                    onClick={handleDownloadPdfDataExcel}
-                    disabled={!BACKEND_URL || downloadingExcel}
+                    type="primary"
+                    icon={<CloudUploadOutlined />}
+                    onClick={() => setCurrentView('upload')}
+                    style={{ fontWeight: 500 }}
                   >
-                    Download PDF data (Excel)
+                    Upload New PDFs
                   </Button>
                   <Button
-                    type="default"
                     icon={<ReloadOutlined />}
-                    loading={pdfDataLoading}
-                    onClick={() => fetchPdfData(pdfDataPage, pdfDataLimit)}
-                    disabled={!BACKEND_URL || pdfDataLoading}
+                    onClick={() => setRefreshKey(prev => prev + 1)}
                   >
                     Refresh
                   </Button>
                 </Space>
-              </div>
-              <div
-                style={{
-                  minWidth: 0,
-                  width: '100%',
-                  maxWidth: '100%',
-                  overflowX: 'auto',
-                  WebkitOverflowScrolling: 'touch',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <Table
-                  rowKey={(_, index) => `pdf-data-${pdfDataPage}-${index}`}
-                  columns={pdfDataColumns}
-                  dataSource={pdfDataRows}
-                  loading={pdfDataLoading}
-                  sticky
-                  pagination={{
-                    current: pdfDataPage,
-                    pageSize: pdfDataLimit,
-                    total: pdfDataTotal,
-                    showSizeChanger: true,
-                    pageSizeOptions: ['10', '20', '50', '100', '200', '500'],
-                    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
-                    onChange: (page, pageSize) => fetchPdfData(page, pageSize),
-                    onShowSizeChange: (_, size) => fetchPdfData(1, size),
-                  }}
-                  scroll={{ x: 'max-content', y: 520 }}
-                  size="small"
-                />
-              </div>
-            </div>
-          </Space>
-        </AppShell>
+              }
+            />
+          </div>
+        )}
+      </div>
+    </AppShell>
   )
 }
