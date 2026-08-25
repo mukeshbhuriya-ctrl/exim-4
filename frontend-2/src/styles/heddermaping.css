@@ -1,0 +1,28 @@
+/* Header Mapping Specific Styles */
+
+.custom-tabs .ant-tabs-nav::before {
+  border-bottom: 1px solid #e2e8f0 !important;
+}
+
+.custom-tabs .ant-tabs-tab {
+  border: 1px solid #e2e8f0 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  border-radius: 6px 6px 0 0 !important;
+  background: #f8fafc !important;
+  margin-right: 2px !important;
+  transition: all 0.2s !important;
+}
+
+.custom-tabs .ant-tabs-tab:hover {
+  color: #1677ff !important;
+}
+
+.custom-tabs .ant-tabs-tab-active {
+  background: #fff !important;
+  border-bottom: 1px solid #fff !important;
+}
+
+.custom-tabs .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: #1677ff !important;
+  font-weight: 600 !important;
+}

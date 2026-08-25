@@ -9,10 +9,13 @@ import {
   Tag,
   Typography,
   Upload,
+  Tabs,
 } from 'antd'
+import { CloudUploadOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
+import '../../../../styles/heddermaping.css'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
 import * as XLSX from 'xlsx'
 
@@ -1912,13 +1915,15 @@ export default function CompanyAdminUploadPage() {
   )
 
   const sectionCardStyle = {
-    border: '1px solid #f0f0f0',
-    borderRadius: 12,
-    padding: 16,
-    background: '#fafafa',
+    border: '1px solid var(--exim-border-light)',
+    borderTop: '4px solid #1677ff',
+    borderRadius: 8,
+    padding: 24,
+    background: '#fff',
     minWidth: 0,
     maxWidth: '100%',
     width: '100%',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
   }
 
   const renderSectionHeader = (title, subtitle, action) => (
@@ -1980,439 +1985,235 @@ export default function CompanyAdminUploadPage() {
     </Space>
   )
 
+  const tabItems = [
+    {
+      key: 'excel_source',
+      label: 'Excel Columns Source',
+      children: (
+        <div style={sectionCardStyle}>
+          <Space direction="vertical" size="large" style={{ width: '100%' }}>
+            <div style={{ marginBottom: 16 }}>
+              <Upload.Dragger
+              multiple={false}
+              accept=".csv,.xlsx,.xls"
+              showUploadList={false}
+              beforeUpload={handleSharedColumnsBeforeUpload}
+              disabled={columnMappingSaving}
+              style={{ padding: '32px 0', border: '1px dashed #1677ff', background: '#f8f9fa', borderRadius: 8 }}
+            >
+              <p className="ant-upload-drag-icon">
+                <CloudUploadOutlined style={{ color: '#1677ff', fontSize: 48 }} />
+              </p>
+              <p className="ant-upload-text" style={{ fontSize: 16, color: 'var(--exim-gray-800)', marginTop: 16, marginBottom: 8 }}>
+                Click or drag Sales Excel to this area to upload
+              </p>
+              <p className="ant-upload-hint" style={{ color: 'rgba(0, 0, 0, 0.45)', fontSize: 14 }}>
+                Upload one file to dynamically populate all mapping dropdowns across the system.
+              </p>
+              {columnFile ? (
+                <div style={{ marginTop: 16 }}>
+                  <Typography.Text strong style={{ color: '#1677ff' }}>{columnFile.name}</Typography.Text>
+                </div>
+              ) : null}
+            </Upload.Dragger>
+          </div>
+          
+          {columnMappingLoading ? (
+            <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
+              Loading saved columns...
+            </Text>
+          ) : sharedColumns.length > 0 ? (
+            <div style={{ marginTop: 10 }}>
+              <Text type="secondary" style={{ marginBottom: 12, display: 'block' }}>
+                {sharedColumns.length} columns loaded and ready for mapping
+              </Text>
+              <div style={{ 
+                maxHeight: 200, 
+                overflowY: 'auto', 
+                padding: 16, 
+                background: '#fafafa', 
+                borderRadius: 8, 
+                border: '1px solid #f0f0f0',
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: 8 
+              }}>
+                {sharedColumns.map((col) => (
+                  <Tag key={col} style={{ padding: '4px 12px', fontSize: 13, background: '#fff', border: '1px solid #e2e8f0', margin: 0 }}>{col}</Tag>
+                ))}
+              </div>
+            </div>
+          ) : null}
+          </Space>
+        </div>
+      ),
+    },
+    {
+      key: 'general_settings',
+      label: 'General Settings',
+      children: (
+        <div style={{ ...sectionCardStyle, padding: '0 32px' }}>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '24px 0', borderBottom: '1px solid var(--exim-border-light)' }}>
+            <div style={{ flex: 1, minWidth: 250 }}>
+              <Title level={5} style={{ margin: 0 }}>Sales Data Unique Column</Title>
+              <Text type="secondary" style={{ fontSize: 13, display: 'block' }}>Pick one or more Sales columns that together identify a unique row.</Text>
+              {!salesUniqueExistingId && (
+                <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 8, color: '#bfbfbf' }}>No unique column mapping saved yet.</Text>
+              )}
+            </div>
+            <div style={{ flex: 2 }}>
+              <Select
+                mode="multiple"
+                style={{ width: '100%' }}
+                placeholder="Search and pick one or more columns"
+                value={salesUniqueColumns}
+                onChange={(values) => setSalesUniqueColumns(Array.isArray(values) ? values.map((v) => String(v)).filter(Boolean) : [])}
+                options={salesUniqueSelectOptions}
+                showSearch
+                allowClear
+              />
+            </div>
+            <div style={{ width: 100, textAlign: 'right' }}>
+              <Button type="primary" onClick={handleSaveSalesUniqueColumns} loading={salesUniqueSaving}>Save</Button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '24px 0', borderBottom: '1px solid var(--exim-border-light)' }}>
+            <div style={{ flex: 1, minWidth: 250 }}>
+              <Title level={5} style={{ margin: 0 }}>Filter Date for Report</Title>
+              <Text type="secondary" style={{ fontSize: 13, display: 'block' }}>Pick one Sales column used as the filter date in reports.</Text>
+              {!filterDateExistingId && (
+                <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 8, color: '#bfbfbf' }}>No filter date column saved yet.</Text>
+              )}
+            </div>
+            <div style={{ flex: 2 }}>
+              <HeaderSearchSelect
+                options={filterDateSelectOptions}
+                value={filterDateColumn}
+                onChange={(next) => setFilterDateColumn(next ? String(next) : undefined)}
+                placeholder="Search or pick filter date column"
+              />
+            </div>
+            <div style={{ width: 100, textAlign: 'right' }}>
+              <Button type="primary" onClick={handleSaveFilterDate} loading={filterDateSaving}>Save</Button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '24px 0', borderBottom: '1px solid var(--exim-border-light)' }}>
+            <div style={{ flex: 1, minWidth: 250 }}>
+              <Title level={5} style={{ margin: 0 }}>Financial Year Column</Title>
+              <Text type="secondary" style={{ fontSize: 13, display: 'block' }}>Pick the Sales date column used to compute financial year (e.g. Billing Date → 2024-25).</Text>
+              {!financialYearExistingId && (
+                <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 8, color: '#bfbfbf' }}>No financial year column saved yet.</Text>
+              )}
+            </div>
+            <div style={{ flex: 2 }}>
+              <HeaderSearchSelect
+                options={financialYearSelectOptions}
+                value={financialYearColumn}
+                onChange={(next) => setFinancialYearColumn(next ? String(next) : undefined)}
+                placeholder="Search or pick date column (e.g. Billing Date)"
+              />
+            </div>
+            <div style={{ width: 100, textAlign: 'right' }}>
+              <Button type="primary" onClick={handleSaveFinancialYear} loading={financialYearSaving}>Save</Button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '24px 0' }}>
+            <div style={{ flex: 1, minWidth: 250 }}>
+              <Title level={5} style={{ margin: 0 }}>Manual Match Description</Title>
+              <Text type="secondary" style={{ fontSize: 13, display: 'block' }}>Pick the Sales Excel description column for manual process matching (PDF uses id.4.DESCRIPTION).</Text>
+              {!manualMatchDescExistingId && (
+                <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 8, color: '#bfbfbf' }}>No description column saved yet.</Text>
+              )}
+            </div>
+            <div style={{ flex: 2 }}>
+              <HeaderSearchSelect
+                options={manualMatchDescSelectOptions}
+                value={manualMatchDescColumn}
+                onChange={(next) => setManualMatchDescColumn(next ? String(next) : undefined)}
+                placeholder="Search or pick description column"
+              />
+            </div>
+            <div style={{ width: 100, textAlign: 'right' }}>
+              <Button type="primary" onClick={handleSaveManualMatchDescription} loading={manualMatchDescSaving}>Save</Button>
+            </div>
+          </div>
+
+        </div>
+      ),
+    },
+    {
+      key: 'sales_pdf_mapping',
+      label: 'Sales & PDF Mapping',
+      children: (
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <div style={{ ...sectionCardStyle }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))', gap: 48 }}>
+              <div>
+                <Title level={4} style={{ margin: 0, marginBottom: 8, color: 'var(--exim-gray-800)' }}>Sales Map</Title>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>Map extracted headers to Excel columns.</Text>
+                {renderSalesMappingForm('inline', true)}
+              </div>
+              <div>
+                <Title level={4} style={{ margin: 0, marginBottom: 8, color: 'var(--exim-gray-800)' }}>PDF Map</Title>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>Map standard static headers to internal fields.</Text>
+                {renderPdfMappingForm('inline', true)}
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--exim-border-light)' }}>
+              <Button type="primary" size="large" onClick={handleSave} loading={saving}>
+                {existingMappingId ? 'Update Field Mappings' : 'Save Field Mappings'}
+              </Button>
+            </div>
+          </div>
+        </Space>
+      ),
+    },
+    {
+      key: 'jv_configuration',
+      label: 'JV Configuration',
+      children: (
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          <div style={sectionCardStyle}>
+            <Title level={4} style={{ margin: 0, marginBottom: 8, color: 'var(--exim-gray-800)' }}>JV Process Header Mapping</Title>
+            <Text type="secondary" style={{ display: 'block' }}>Map INV, Date, and Business Area from JV Excel.</Text>
+            {!jvExistingMappingId && (
+              <Text type="secondary" style={{ display: 'block', marginTop: 8, marginBottom: 24, color: '#bfbfbf' }}>No JV mapping saved yet.</Text>
+            )}
+            {jvExistingMappingId && <div style={{ marginBottom: 24 }} />}
+            
+            <div style={{ maxWidth: 600 }}>
+              {renderJvMappingForm('inline-jv', true)}
+            </div>
+            
+            <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--exim-border-light)' }}>
+              <Button type="primary" onClick={handleSaveJv} loading={jvSaving}>
+                {jvExistingMappingId ? 'Update JV Mapping' : 'Save JV Mapping'}
+              </Button>
+            </div>
+          </div>
+        </Space>
+      ),
+    },
+  ]
+
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-            <PageHeader
-              title="Header Mapping"
-              description="Upload Sales Excel once to load columns, then configure Sales/PDF, unique columns, JV, filter date, financial year, and description mappings."
-            />
-
-            <div style={sectionCardStyle}>
-              {renderSectionHeader(
-                'Excel Columns',
-                'Upload one Sales Excel file. Its headers are saved and used in every mapping dropdown below.',
-              )}
-              <Upload.Dragger
-                multiple={false}
-                accept=".csv,.xlsx,.xls"
-                showUploadList={false}
-                beforeUpload={handleSharedColumnsBeforeUpload}
-                disabled={columnMappingSaving}
-                style={{ padding: 16 }}
-              >
-                <Title level={5} style={{ margin: 0 }}>
-                  Sales Excel
-                </Title>
-                <Text type="secondary">
-                  Drop Excel here to load columns for all header mappings
-                </Text>
-                {columnFile ? (
-                  <div style={{ marginTop: 8 }}>
-                    <Text strong>{columnFile.name}</Text>
-                  </div>
-                ) : null}
-              </Upload.Dragger>
-              {columnMappingLoading ? (
-                <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
-                  Loading saved columns...
-                </Text>
-              ) : sharedColumns.length > 0 ? (
-                <div style={{ marginTop: 12 }}>
-                  <Text type="secondary">
-                    {sharedColumns.length} columns loaded
-                  </Text>
-                  <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {sharedColumns.slice(0, 20).map((col) => (
-                      <Tag key={col}>{col}</Tag>
-                    ))}
-                    {sharedColumns.length > 20 ? (
-                      <Tag>+{sharedColumns.length - 20} more</Tag>
-                    ) : null}
-                  </div>
-                </div>
-              ) : (
-                <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
-                  No columns stored yet. Upload an Excel file to populate mapping dropdowns.
-                </Text>
-              )}
-            </div>
-
-            <div style={sectionCardStyle}>
-              {renderSectionHeader(
-                'Sales & PDF Header Mapping',
-                mode === 'update'
-                  ? 'Current Sales and PDF column mapping.'
-                  : 'Map required Sales/PDF headers using the uploaded Excel columns.',
-                !mappingModalOpen ? (
-                  <Button type="primary" onClick={() => setMappingModalOpen(true)}>
-                    {mode === 'update' ? 'Update Header Mapping' : 'Create Header Mapping'}
-                  </Button>
-                ) : null,
-              )}
-              {loadingMapping ? (
-                <Text type="secondary">Loading saved header mapping...</Text>
-              ) : mode === 'update' && existingPreview ? (
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
-                    gap: 16,
-                    width: '100%',
-                  }}
-                >
-                  <div style={{ ...sectionCardStyle, background: '#fff' }}>
-                    <Title level={5} style={{ margin: 0, marginBottom: 12 }}>
-                      Sales Header Map
-                    </Title>
-                    {renderSalesMappingForm('preview', false)}
-                  </div>
-                  <div style={{ ...sectionCardStyle, background: '#fff' }}>
-                    <Title level={5} style={{ margin: 0, marginBottom: 12 }}>
-                      PDF Header Map
-                    </Title>
-                    {renderPdfMappingForm('preview', false)}
-                  </div>
-                </div>
-              ) : (
-                <Text type="secondary">No header mapping saved yet. Use the button on the right to create one.</Text>
-              )}
-            </div>
-
-            <div style={sectionCardStyle}>
-              {renderSectionHeader(
-                'Sales Data Unique Column',
-                'Pick one or more Sales columns that together identify a unique row.',
-                !salesUniqueModalOpen ? (
-                  <Button
-                    type="primary"
-                    onClick={async () => {
-                      setSalesUniqueModalOpen(true)
-                      await fetchSalesUniqueColumns()
-                    }}
-                  >
-                    {salesUniqueMode === 'update' ? 'Update Unique Columns' : 'Setup Unique Columns'}
-                  </Button>
-                ) : null,
-              )}
-              {salesUniqueLoading ? (
-                <Text type="secondary">Loading sales unique column mapping...</Text>
-              ) : salesUniqueMode === 'update' && salesUniqueExistingPreview ? (
-                renderSalesUniqueColumnForm(false)
-              ) : (
-                <Text type="secondary">
-                  No unique column mapping saved yet. Use the button on the right to configure it.
-                </Text>
-              )}
-            </div>
-
-            <div style={sectionCardStyle}>
-              {renderSectionHeader(
-                'JV Process Header Mapping',
-                'Map INV, Date, and Business Area from JV Excel.',
-                !jvMappingModalOpen ? (
-                  <Button type="primary" onClick={() => setJvMappingModalOpen(true)}>
-                    {jvMode === 'update'
-                      ? 'Update JV Mapping'
-                      : 'Setup JV Mapping'}
-                  </Button>
-                ) : null,
-              )}
-              {jvLoadingMapping ? (
-                <Text type="secondary">Loading JV process header mapping...</Text>
-              ) : jvMode === 'update' && jvExistingPreview ? (
-                renderJvMappingForm('preview-jv', false)
-              ) : (
-                <Text type="secondary">No JV mapping saved yet. Use the button on the right to set it up.</Text>
-              )}
-            </div>
-
-            <div style={sectionCardStyle}>
-              {renderSectionHeader(
-                'Filter Date for Report',
-                'Pick one Sales column used as the filter date in reports.',
-                !filterDateModalOpen ? (
-                  <Button
-                    type="primary"
-                    onClick={async () => {
-                      setFilterDateModalOpen(true)
-                      await fetchFilterDateMapping()
-                    }}
-                  >
-                    {filterDateMode === 'update'
-                      ? 'Update Filter Date'
-                      : 'Setup Filter Date'}
-                  </Button>
-                ) : null,
-              )}
-              {filterDateLoading ? (
-                <Text type="secondary">Loading filter date header mapping...</Text>
-              ) : filterDateMode === 'update' && filterDateExistingPreview ? (
-                renderFilterDateMappingForm('preview-filter-date', false)
-              ) : (
-                <Text type="secondary">
-                  No filter date column saved yet. Use the button on the right to configure it.
-                </Text>
-              )}
-            </div>
-
-            <div style={sectionCardStyle}>
-              {renderSectionHeader(
-                'Financial Year Column',
-                'Pick the Sales date column used to compute financial year (e.g. Billing Date → 2024-25).',
-                !financialYearModalOpen ? (
-                  <Button
-                    type="primary"
-                    onClick={async () => {
-                      setFinancialYearModalOpen(true)
-                      await fetchFinancialYearMapping()
-                    }}
-                  >
-                    {financialYearMode === 'update'
-                      ? 'Update Financial Year'
-                      : 'Setup Financial Year'}
-                  </Button>
-                ) : null,
-              )}
-              {financialYearLoading ? (
-                <Text type="secondary">Loading financial year header mapping...</Text>
-              ) : financialYearMode === 'update' && financialYearExistingPreview ? (
-                renderFinancialYearMappingForm('preview-financial-year', false)
-              ) : (
-                <Text type="secondary">
-                  No financial year column saved yet. Use the button on the right to configure it.
-                </Text>
-              )}
-            </div>
-
-            <div style={sectionCardStyle}>
-              {renderSectionHeader(
-                'Manual Match Description',
-                'Pick the Sales Excel description column for manual process matching (PDF uses id.4.DESCRIPTION).',
-                !manualMatchDescModalOpen ? (
-                  <Button
-                    type="primary"
-                    onClick={async () => {
-                      setManualMatchDescModalOpen(true)
-                      await fetchManualMatchDescriptionMapping()
-                    }}
-                  >
-                    {manualMatchDescMode === 'update'
-                      ? 'Update Description Column'
-                      : 'Setup Description Column'}
-                  </Button>
-                ) : null,
-              )}
-              {manualMatchDescLoading ? (
-                <Text type="secondary">Loading manual match description mapping...</Text>
-              ) : manualMatchDescMode === 'update' && manualMatchDescExistingPreview ? (
-                renderManualMatchDescriptionForm('preview-manual-match-desc', false)
-              ) : (
-                <Text type="secondary">
-                  No description column saved yet. Use the button on the right to configure it.
-                </Text>
-              )}
-            </div>
-
-            <Modal
-              open={mappingModalOpen}
-              onCancel={() => setMappingModalOpen(false)}
-              footer={null}
-              width="95vw"
-              style={{ top: 24, maxWidth: 1400 }}
-              destroyOnClose
-            >
-              {sharedColumns.length === 0 ? (
-                <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                  Upload Sales Excel above first so column dropdowns are populated.
-                </Text>
-              ) : null}
-
-              <div
-                style={{
-                  marginTop: 0,
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
-                  gap: 16,
-                  alignItems: 'start',
-                }}
-              >
-                <div style={{ border: '1px solid #f0f0f0', borderRadius: 12, padding: 16 }}>
-                  <Title level={5} style={{ margin: 0, marginBottom: 12 }}>
-                    Sales Header Map
-                  </Title>
-                  {renderSalesMappingForm('modal', true)}
-                </div>
-
-                <div style={{ border: '1px solid #f0f0f0', borderRadius: 12, padding: 16 }}>
-                  <Title level={5} style={{ margin: 0, marginBottom: 12 }}>
-                    PDF Header Map
-                  </Title>
-                  {renderPdfMappingForm('modal', true)}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 16 }}>
-                <Button type="primary" onClick={handleSave} loading={saving}>
-                  {mode === 'update' ? 'Update Header Mapping' : 'Create Header Mapping'}
-                </Button>
-              </div>
-            </Modal>
-
-            <Modal
-              open={jvMappingModalOpen}
-              onCancel={() => setJvMappingModalOpen(false)}
-              footer={null}
-              width={900}
-              style={{ top: 24, maxWidth: '95vw' }}
-              destroyOnClose
-            >
-              {sharedColumns.length === 0 ? (
-                <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                  Upload Sales Excel above first so column dropdowns are populated.
-                </Text>
-              ) : null}
-
-              <div style={{ border: '1px solid #f0f0f0', borderRadius: 12, padding: 16 }}>
-                <Title level={5} style={{ margin: 0, marginBottom: 12 }}>
-                  JV Process Header Map
-                </Title>
-                {renderJvMappingForm('modal-jv', true)}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 16 }}>
-                <Button type="primary" onClick={handleSaveJv} loading={jvSaving}>
-                  {jvMode === 'update'
-                    ? 'Update JV Process Header Mapping'
-                    : 'Setup JV Process Header Mapping'}
-                </Button>
-              </div>
-            </Modal>
-
-            <Modal
-              open={filterDateModalOpen}
-              onCancel={() => setFilterDateModalOpen(false)}
-              footer={null}
-              width={900}
-              style={{ top: 24, maxWidth: '95vw' }}
-              destroyOnClose
-            >
-              {sharedColumns.length === 0 ? (
-                <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                  Upload Sales Excel above first so column dropdowns are populated.
-                </Text>
-              ) : null}
-
-              <div style={{ border: '1px solid #f0f0f0', borderRadius: 12, padding: 16 }}>
-                <Title level={5} style={{ margin: 0, marginBottom: 12 }}>
-                  Filter Date for Report
-                </Title>
-                {renderFilterDateMappingForm('modal-filter-date', true)}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 16 }}>
-                <Button type="primary" onClick={handleSaveFilterDate} loading={filterDateSaving}>
-                  {filterDateMode === 'update'
-                    ? 'Update Filter Date Mapping'
-                    : 'Save Filter Date Mapping'}
-                </Button>
-              </div>
-            </Modal>
-
-            <Modal
-              open={salesUniqueModalOpen}
-              onCancel={() => setSalesUniqueModalOpen(false)}
-              footer={null}
-              width={900}
-              style={{ top: 24, maxWidth: '95vw' }}
-              destroyOnClose
-            >
-              {sharedColumns.length === 0 ? (
-                <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                  Upload Sales Excel above first so column dropdowns are populated.
-                </Text>
-              ) : null}
-
-              <div style={{ border: '1px solid #f0f0f0', borderRadius: 12, padding: 16 }}>
-                <Title level={5} style={{ margin: 0, marginBottom: 12 }}>
-                  Sales Data Unique Column
-                </Title>
-                {renderSalesUniqueColumnForm(true)}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 16 }}>
-                <Button type="primary" onClick={handleSaveSalesUniqueColumns} loading={salesUniqueSaving}>
-                  {salesUniqueMode === 'update'
-                    ? 'Update Unique Column Mapping'
-                    : 'Save Unique Column Mapping'}
-                </Button>
-              </div>
-            </Modal>
-
-            <Modal
-              open={financialYearModalOpen}
-              onCancel={() => setFinancialYearModalOpen(false)}
-              footer={null}
-              width={900}
-              style={{ top: 24, maxWidth: '95vw' }}
-              destroyOnClose
-            >
-              {sharedColumns.length === 0 ? (
-                <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                  Upload Sales Excel above first so column dropdowns are populated.
-                </Text>
-              ) : null}
-
-              <div style={{ border: '1px solid #f0f0f0', borderRadius: 12, padding: 16 }}>
-                <Title level={5} style={{ margin: 0, marginBottom: 12 }}>
-                  Financial Year Column
-                </Title>
-                {renderFinancialYearMappingForm('modal-financial-year', true)}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 16 }}>
-                <Button type="primary" onClick={handleSaveFinancialYear} loading={financialYearSaving}>
-                  {financialYearMode === 'update'
-                    ? 'Update Financial Year Mapping'
-                    : 'Save Financial Year Mapping'}
-                </Button>
-              </div>
-            </Modal>
-
-            <Modal
-              open={manualMatchDescModalOpen}
-              onCancel={() => setManualMatchDescModalOpen(false)}
-              footer={null}
-              width={900}
-              style={{ top: 24, maxWidth: '95vw' }}
-              destroyOnClose
-            >
-              {sharedColumns.length === 0 ? (
-                <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                  Upload Sales Excel above first so column dropdowns are populated.
-                </Text>
-              ) : null}
-
-              <div style={{ border: '1px solid #f0f0f0', borderRadius: 12, padding: 16 }}>
-                <Title level={5} style={{ margin: 0, marginBottom: 12 }}>
-                  Description Column
-                </Title>
-                {renderManualMatchDescriptionForm('modal-manual-match-desc', true)}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 16 }}>
-                <Button
-                  type="primary"
-                  onClick={handleSaveManualMatchDescription}
-                  loading={manualMatchDescSaving}
-                >
-                  {manualMatchDescMode === 'update'
-                    ? 'Update Description Mapping'
-                    : 'Save Description Mapping'}
-                </Button>
-              </div>
-            </Modal>
-          </Space>
-        </AppShell>
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 10 }}>
+        <PageHeader
+          title="Header Mapping"
+          description="Upload Sales Excel once to load columns, then configure your extraction and global mappings."
+        />
+        <Tabs
+          defaultActiveKey="excel_source"
+          items={tabItems}
+          type="card"
+          className="custom-tabs"
+        />
+      </div>
+    </AppShell>
   )
 }
