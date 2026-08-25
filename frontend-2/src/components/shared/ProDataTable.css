@@ -42,13 +42,12 @@
   border-bottom-right-radius: 0 !important;
 }
 
-.pro-table-antd .ant-table-tbody > tr > td {
+.pro-table-antd .ant-table-tbody > tr:not(.ant-table-measure-row) > td {
   font-size: 13px !important;
   font-weight: 500;
   color: var(--exim-gray-600);
-  padding: 4px 12px !important;
-  border-bottom: 1px solid rgba(241, 245, 249, 0.6) !important; /* slate-100/60 */
-  height: 32px; /* Matches h-8 from tailwind */
+  padding: 10px 16px !important;
+  border-bottom: 1px solid rgba(241, 245, 249, 0.8) !important; 
   transition: background-color 0.2s ease;
 }
 

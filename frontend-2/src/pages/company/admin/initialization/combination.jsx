@@ -1,4 +1,4 @@
-import { Button, Layout, Modal, Select, Space, Table, Tag, Typography, message } from 'antd'
+import { Button, Layout, Select, Space, Table, Tag, Typography, message, Popconfirm } from 'antd'
 import { useEffect, useState } from 'react'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
@@ -6,6 +6,15 @@ import PageHeader from '../../../../components/common/PageHeader.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
+
+const sectionCardStyle = {
+  background: '#fff',
+  padding: '24px',
+  borderRadius: '8px',
+  borderTop: '4px solid #1677ff',
+  boxShadow: '0 1px 2px 0 rgba(0,0,0,0.03)',
+  border: '1px solid var(--exim-border-light, #e2e8f0)',
+}
 
 /** Fallback part keys if API returns nothing yet */
 const DEFAULT_SALES_KEYS = ['inv', 'qty1', 'qty2', 'amount']
@@ -157,6 +166,7 @@ export default function CompanyAdminCombinationPage() {
 
   const [loading, setLoading] = useState(false)
   const [combinations, setCombinations] = useState([])
+  const [isEditing, setIsEditing] = useState(false)
 
   // modal state
   const [open, setOpen] = useState(false)
@@ -171,45 +181,50 @@ export default function CompanyAdminCombinationPage() {
 
   useEffect(() => {
     let mounted = true
-    const fetchCombinations = async () => {
+    const loadData = async () => {
       if (!BACKEND_URL) return
       setLoading(true)
+      
+      let mappingResult = null
       try {
-        // NOTE: endpoint name not provided by you. Adjust if backend differs.
-        const res = await fetch(`${BACKEND_URL}/api/company/admin/combination/`, {
-          method: 'GET',
-          credentials: 'include',
-        })
+        const mapRes = await fetch(`${BACKEND_URL}/api/company/admin/header-mapping/`, { method: 'GET', credentials: 'include' })
+        const mapData = await mapRes.json().catch(() => ({}))
+        if (mapRes.ok) mappingResult = extractHeaderMapping(mapData)
+      } catch {}
+      
+      if (mounted && mappingResult) setHeaderMapping(mappingResult)
 
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) {
-          // keep blank UI if 404 / not found
-          setCombinations([])
-          return
+      let comboResult = []
+      try {
+        const comboRes = await fetch(`${BACKEND_URL}/api/company/admin/combination/`, { method: 'GET', credentials: 'include' })
+        const comboData = await comboRes.json().catch(() => ({}))
+        if (comboRes.ok) {
+          comboResult = comboData?.data || comboData?.combinations || comboData?.results || comboData?.combination || comboData || []
+          comboResult = Array.isArray(comboResult) ? comboResult : comboResult ? [comboResult] : []
         }
+      } catch {}
+      
+      if (mounted) {
+        setCombinations(comboResult)
+        const sk = mappingResult?.salesKeys?.length ? mappingResult.salesKeys : DEFAULT_SALES_KEYS
+        const pk = mappingResult?.pdfKeys?.length ? mappingResult.pdfKeys : DEFAULT_PDF_KEYS
+        const salesSaved = extractSavedCombinationRows(comboResult, 'sales')
+        const pdfSaved = extractSavedCombinationRows(comboResult, 'pdf')
+        const hasSaved = salesSaved.length > 0 || pdfSaved.length > 0
 
-        const list =
-          data?.data ||
-          data?.combinations ||
-          data?.results ||
-          data?.combination ||
-          data ||
-          []
-
-        if (!mounted) return
-        setCombinations(Array.isArray(list) ? list : list ? [list] : [])
-      } catch {
-        if (!mounted) return
-        setCombinations([])
-      } finally {
-        if (mounted) setLoading(false)
+        if (hasSaved) {
+          setSalesDraftRows(salesSaved.length ? savedTableRowsToDraftRows(salesSaved, sk) : [createDraftRow(sk.length)])
+          setPdfDraftRows(pdfSaved.length ? savedTableRowsToDraftRows(pdfSaved, pk) : [createDraftRow(pk.length)])
+        } else {
+          setSalesDraftRows([createDraftRow(sk.length)])
+          setPdfDraftRows([createDraftRow(pk.length)])
+        }
+        setLoading(false)
       }
     }
 
-    fetchCombinations()
-    return () => {
-      mounted = false
-    }
+    loadData()
+    return () => { mounted = false }
   }, [BACKEND_URL])
 
   const extractHeaderMapping = (raw) => {
@@ -302,6 +317,23 @@ export default function CompanyAdminCombinationPage() {
   const addPdfDraftRow = () => {
     const n = headerMapping?.pdfKeys?.length ?? DEFAULT_PDF_KEYS.length
     setPdfDraftRows((prev) => [...prev, createDraftRow(n)])
+  }
+
+  const restoreDrafts = (comboList) => {
+    const listToUse = comboList || combinations
+    const sk = headerMapping?.salesKeys?.length ? headerMapping.salesKeys : DEFAULT_SALES_KEYS
+    const pk = headerMapping?.pdfKeys?.length ? headerMapping.pdfKeys : DEFAULT_PDF_KEYS
+    const salesSaved = extractSavedCombinationRows(listToUse, 'sales')
+    const pdfSaved = extractSavedCombinationRows(listToUse, 'pdf')
+    const hasSaved = salesSaved.length > 0 || pdfSaved.length > 0
+
+    if (hasSaved) {
+      setSalesDraftRows(salesSaved.length ? savedTableRowsToDraftRows(salesSaved, sk) : [createDraftRow(sk.length)])
+      setPdfDraftRows(pdfSaved.length ? savedTableRowsToDraftRows(pdfSaved, pk) : [createDraftRow(pk.length)])
+    } else {
+      setSalesDraftRows([createDraftRow(sk.length)])
+      setPdfDraftRows([createDraftRow(pk.length)])
+    }
   }
 
   const resetDraft = () => {
@@ -398,8 +430,6 @@ export default function CompanyAdminCombinationPage() {
       }
 
       message.success('Combinations saved successfully')
-      setOpen(false)
-      resetDraft()
 
       // refresh list
       setLoading(true)
@@ -414,7 +444,10 @@ export default function CompanyAdminCombinationPage() {
         refetchData?.results ||
         refetchData ||
         []
-      setCombinations(Array.isArray(list) ? list : list ? [list] : [])
+      const parsedList = Array.isArray(list) ? list : list ? [list] : []
+      setCombinations(parsedList)
+      restoreDrafts(parsedList)
+      setIsEditing(false)
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Failed to save combinations')
     } finally {
@@ -472,7 +505,7 @@ export default function CompanyAdminCombinationPage() {
   const salesTableColumns = Array.from({ length: salesKeysResolved.length }, (_, index) => ({
     title: `Part ${index + 1}`,
     key: `sales-part-${index}`,
-    render: (_, record) => (
+    render: (_, record) => isEditing ? (
       <Select
         allowClear
         style={{ width: '100%' }}
@@ -481,16 +514,19 @@ export default function CompanyAdminCombinationPage() {
         placeholder="Select"
         onChange={(value) => updateDraftRow('sales', record.id, index, value)}
       />
+    ) : (
+      <Text>{record.slots[index] || <span style={{ color: '#d9d9d9' }}>Blank</span>}</Text>
     ),
   }))
 
-  salesTableColumns.push(
-    {
-      title: 'Combination',
-      key: 'sales-combination',
-      render: (_, record) => <Text code>{formatComboForDisplay(buildComboString(record.slots)) || '-'}</Text>,
-    },
-    {
+  salesTableColumns.push({
+    title: 'Combination',
+    key: 'sales-combination',
+    render: (_, record) => <Text code>{formatComboForDisplay(buildComboString(record.slots)) || '-'}</Text>,
+  })
+
+  if (isEditing) {
+    salesTableColumns.push({
       title: 'X',
       key: 'sales-action',
       width: 64,
@@ -499,13 +535,13 @@ export default function CompanyAdminCombinationPage() {
           X
         </Button>
       ),
-    },
-  )
+    })
+  }
 
   const pdfTableColumns = Array.from({ length: pdfKeysResolved.length }, (_, index) => ({
     title: `Part ${index + 1}`,
     key: `pdf-part-${index}`,
-    render: (_, record) => (
+    render: (_, record) => isEditing ? (
       <Select
         allowClear
         style={{ width: '100%' }}
@@ -514,16 +550,19 @@ export default function CompanyAdminCombinationPage() {
         placeholder="Select"
         onChange={(value) => updateDraftRow('pdf', record.id, index, value)}
       />
+    ) : (
+      <Text>{record.slots[index] || <span style={{ color: '#d9d9d9' }}>Blank</span>}</Text>
     ),
   }))
 
-  pdfTableColumns.push(
-    {
-      title: 'Combination',
-      key: 'pdf-combination',
-      render: (_, record) => <Text code>{formatComboForDisplay(buildComboString(record.slots)) || '-'}</Text>,
-    },
-    {
+  pdfTableColumns.push({
+    title: 'Combination',
+    key: 'pdf-combination',
+    render: (_, record) => <Text code>{formatComboForDisplay(buildComboString(record.slots)) || '-'}</Text>,
+  })
+
+  if (isEditing) {
+    pdfTableColumns.push({
       title: 'X',
       key: 'pdf-action',
       width: 64,
@@ -532,202 +571,44 @@ export default function CompanyAdminCombinationPage() {
           X
         </Button>
       ),
-    },
-  )
+    })
+  }
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-            <div>
-              <Title level={3} style={{ margin: 0 }}>
-                Combinations
-              </Title>
-              <Text type="secondary">Sales combinations on the left, PDF combinations on the right.</Text>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-              <Button
-                type="primary"
-                onClick={async () => {
-                  setOpen(true)
-                  const extracted = await fetchHeaderMapping()
-                  const sk = extracted?.salesKeys?.length
-                    ? extracted.salesKeys
-                    : headerMapping?.salesKeys?.length
-                      ? headerMapping.salesKeys
-                      : DEFAULT_SALES_KEYS
-                  const pk = extracted?.pdfKeys?.length
-                    ? extracted.pdfKeys
-                    : headerMapping?.pdfKeys?.length
-                      ? headerMapping.pdfKeys
-                      : DEFAULT_PDF_KEYS
-
-                  const salesSaved = extractSavedCombinationRows(combinations, 'sales')
-                  const pdfSaved = extractSavedCombinationRows(combinations, 'pdf')
-                  const hasSaved = salesSaved.length > 0 || pdfSaved.length > 0
-
-                  if (hasSaved) {
-                    setSalesDraftRows(
-                      salesSaved.length
-                        ? savedTableRowsToDraftRows(salesSaved, sk)
-                        : [createDraftRow(sk.length)],
-                    )
-                    setPdfDraftRows(
-                      pdfSaved.length
-                        ? savedTableRowsToDraftRows(pdfSaved, pk)
-                        : [createDraftRow(pk.length)],
-                    )
-                  } else {
-                    initializeDraftTables(extracted)
-                  }
-                }}
-              >
-                {hasExistingCombinations ? 'Modify combination' : 'Setup Combination'}
-              </Button>
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 20,
-                alignItems: 'start',
-              }}
-            >
-              <div
-                style={{
-                  flex: '1 1 360px',
-                  border: '1px solid #f0f0f0',
-                  borderRadius: 16,
-                  padding: 20,
-                  background: 'linear-gradient(180deg, #ffffff 0%, #fafafa 100%)',
-                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.04)',
-                  minWidth: 0,
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 12,
-                    marginBottom: 16,
-                  }}
-                >
-                  <div>
-                    <Text strong style={{ display: 'block' }}>
-                      Sales Combinations
-                    </Text>
-                    <Text type="secondary">Available sales-side mappings.</Text>
-                  </div>
-                  <Tag color="blue">{salesCombinationRows.length}</Tag>
-                </div>
-
-                <Table
-                  size="small"
-                  loading={loading}
-                  pagination={false}
-                  columns={salesSavedColumns}
-                  dataSource={salesCombinationRows}
-                  locale={{ emptyText: 'No sales combinations yet' }}
-                  scroll={{ x: 420 }}
-                />
-              </div>
-
-              <div
-                style={{
-                  flex: '1 1 360px',
-                  border: '1px solid #f0f0f0',
-                  borderRadius: 16,
-                  padding: 20,
-                  background: 'linear-gradient(180deg, #ffffff 0%, #fafafa 100%)',
-                  boxShadow: '0 10px 30px rgba(15, 23, 42, 0.04)',
-                  minWidth: 0,
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 12,
-                    marginBottom: 16,
-                  }}
-                >
-                  <div>
-                    <Text strong style={{ display: 'block' }}>
-                      PDF Combinations
-                    </Text>
-                    <Text type="secondary">Available PDF-side mappings.</Text>
-                  </div>
-                  <Tag color="green">{pdfCombinationRows.length}</Tag>
-                </div>
-
-                <Table
-                  size="small"
-                  loading={loading}
-                  pagination={false}
-                  columns={pdfSavedColumns}
-                  dataSource={pdfCombinationRows}
-                  locale={{ emptyText: 'No PDF combinations yet' }}
-                  scroll={{ x: 420 }}
-                />
-              </div>
-            </div>
+      <PageHeader
+        title="Header Combinations"
+        description="Build Sales combinations on the left and PDF combinations on the right, then save both sets together."
+        actions={
+          <Space wrap>
+            {isEditing ? (
+              <>
+                <Button onClick={resetDraft}>Clear</Button>
+                <Button onClick={() => { setIsEditing(false); restoreDrafts(); }}>Cancel</Button>
+                <Button type="primary" loading={saving} onClick={handleCreateCombination}>Save Changes</Button>
+              </>
+            ) : (
+              <Button type="primary" onClick={() => setIsEditing(true)}>Modify combination</Button>
+            )}
           </Space>
-        
+        }
+      />
 
-      <Modal
-        open={open}
-        onCancel={() => { setOpen(false); resetDraft() }}
-        footer={null}
-        width="95vw"
-        style={{ top: 24, maxWidth: 1400 }}
-        bodyStyle={{ height: '80vh', overflow: 'auto' }}
-        destroyOnClose
-      >
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <Title level={4} style={{ margin: 0 }}>
-            {hasExistingCombinations ? 'Modify Header Combinations' : 'Setup Header Combinations'}
-          </Title>
-          <Text type="secondary">
-            {hasExistingCombinations
-              ? 'Update Sales and PDF rows below, then save.'
-              : 'Build Sales rows on the left and PDF rows on the right, then save both sets together.'}
-          </Text>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12 }}>
-            {loadingMapping ? <Text type="secondary">Loading header mapping...</Text> : null}
-          </div>
-
-          <div
-            style={{
-              marginTop: 12,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-              alignItems: 'start',
-              width: '100%',
-            }}
-          >
-            <div
-              style={{
-                minWidth: 0,
-                border: '1px solid #f0f0f0',
-                borderRadius: 12,
-                padding: 16,
-                background: '#fff',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                <div>
-                  <Text strong style={{ display: 'block' }}>
-                    Sales Combination
-                  </Text>
-                  <Text type="secondary">Left-side sales builder</Text>
-                </div>
-                <Button onClick={addSalesDraftRow}>+ Add Row</Button>
+      <Space direction="vertical" size="large" style={{ width: '100%', marginTop: 24 }}>
+        <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          
+          <div style={{ ...sectionCardStyle, flex: '1 1 45%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <Space align="center" style={{ marginBottom: 4 }}>
+                  <Title level={5} style={{ margin: 0, color: 'var(--exim-gray-800)' }}>Sales Combinations</Title>
+                  <Tag color="blue" style={{ margin: 0, border: 'none', background: '#e6f4ff', color: '#1677ff' }}>{salesCombinationRows.length}</Tag>
+                </Space>
+                <Text type="secondary" style={{ fontSize: 13, display: 'block' }}>Available sales-side mappings.</Text>
               </div>
+              {isEditing && <Button onClick={addSalesDraftRow}>+ Add Row</Button>}
+            </div>
+            {isEditing ? (
               <Table
                 size="small"
                 pagination={false}
@@ -736,26 +617,30 @@ export default function CompanyAdminCombinationPage() {
                 locale={{ emptyText: 'No sales rows' }}
                 scroll={{ x: Math.max(760, salesKeysResolved.length * 130) }}
               />
-            </div>
+            ) : (
+              <Table
+                size="small"
+                pagination={false}
+                columns={salesSavedColumns}
+                dataSource={salesCombinationRows}
+                locale={{ emptyText: 'No sales combinations yet' }}
+                scroll={{ x: 420 }}
+              />
+            )}
+          </div>
 
-            <div
-              style={{
-                minWidth: 0,
-                border: '1px solid #f0f0f0',
-                borderRadius: 12,
-                padding: 16,
-                background: '#fff',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                <div>
-                  <Text strong style={{ display: 'block' }}>
-                    PDF Combination
-                  </Text>
-                  <Text type="secondary">Right-side PDF builder</Text>
-                </div>
-                <Button onClick={addPdfDraftRow}>+ Add Row</Button>
+          <div style={{ ...sectionCardStyle, flex: '1 1 45%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <Space align="center" style={{ marginBottom: 4 }}>
+                  <Title level={5} style={{ margin: 0, color: 'var(--exim-gray-800)' }}>PDF Combinations</Title>
+                  <Tag color="green" style={{ margin: 0, border: 'none', background: '#f6ffed', color: '#52c41a' }}>{pdfCombinationRows.length}</Tag>
+                </Space>
+                <Text type="secondary" style={{ fontSize: 13, display: 'block' }}>Available PDF-side mappings.</Text>
               </div>
+              {isEditing && <Button onClick={addPdfDraftRow}>+ Add Row</Button>}
+            </div>
+            {isEditing ? (
               <Table
                 size="small"
                 pagination={false}
@@ -764,18 +649,20 @@ export default function CompanyAdminCombinationPage() {
                 locale={{ emptyText: 'No PDF rows' }}
                 scroll={{ x: Math.max(640, pdfKeysResolved.length * 130) }}
               />
-            </div>
+            ) : (
+              <Table
+                size="small"
+                pagination={false}
+                columns={pdfSavedColumns}
+                dataSource={pdfCombinationRows}
+                locale={{ emptyText: 'No PDF combinations yet' }}
+                scroll={{ x: 420 }}
+              />
+            )}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-            <Button onClick={resetDraft}>Clear</Button>
-            <Button onClick={() => { setOpen(false); resetDraft() }}>Cancel</Button>
-            <Button type="primary" loading={saving} onClick={handleCreateCombination}>
-              {hasExistingCombinations ? 'Save changes' : 'Create combination'}
-            </Button>
-          </div>
-        </Space>
-      </Modal>
+        </div>
+      </Space>
     </AppShell>
   )
 }
