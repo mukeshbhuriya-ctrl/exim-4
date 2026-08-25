@@ -1,5 +1,5 @@
 import { WarningOutlined } from '@ant-design/icons'
-import { Alert, Button, Checkbox, Layout, Modal, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd'
+import { Alert, Button, Checkbox, Layout, Select, Space, Table, Tag, Tooltip, Typography, message } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
@@ -8,6 +8,14 @@ import PageHeader from '../../../../components/common/PageHeader.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
+
+const sectionCardStyle = {
+  background: '#ffffff',
+  borderRadius: 8,
+  padding: 24,
+  boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 1px 6px -1px rgba(0,0,0,0.02), 0 2px 4px rgba(0,0,0,0.02)',
+  borderTop: '4px solid #1677ff',
+}
 
 function formatComboForDisplay(comboString) {
   return (comboString || '').split('_').filter(Boolean).join(' | ')
@@ -161,12 +169,37 @@ export default function CompanyAdminConnectCombinationPage() {
 
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [open, setOpen] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
   const [companyId, setCompanyId] = useState(null)
   const [salesCombinationEntries, setSalesCombinationEntries] = useState([])
   const [pdfCombinationEntries, setPdfCombinationEntries] = useState([])
   const [existingConnections, setExistingConnections] = useState([])
   const [connectionDraftRows, setConnectionDraftRows] = useState(() => [createConnectionRow()])
+
+  const restoreDrafts = () => {
+    setConnectionDraftRows(
+      existingConnections.length
+        ? existingConnections.map((row) =>
+            createConnectionRow({
+              id: row.id,
+              salesId: row.salesId,
+              pdfId: row.pdfId,
+              matchDuplicate: row.matchDuplicate,
+            }),
+          )
+        : [createConnectionRow()],
+    )
+  }
+
+  const resetDraft = () => {
+    setConnectionDraftRows([createConnectionRow()])
+  }
+
+  useEffect(() => {
+    if (!isEditing) {
+      restoreDrafts()
+    }
+  }, [existingConnections, isEditing])
 
   const hasBuildData =
     Array.isArray(salesCombinationEntries) &&
@@ -310,27 +343,6 @@ export default function CompanyAdminConnectCombinationPage() {
     [existingConnections, salesById, pdfById],
   )
 
-  const openCreateModal = () => {
-    setConnectionDraftRows(
-      existingConnections.length
-        ? existingConnections.map((row) =>
-            createConnectionRow({
-              id: row.id,
-              salesId: row.salesId,
-              pdfId: row.pdfId,
-              matchDuplicate: row.matchDuplicate,
-            }),
-          )
-        : [createConnectionRow()],
-    )
-    setOpen(true)
-  }
-
-  const closeCreateModal = () => {
-    setOpen(false)
-    setConnectionDraftRows([createConnectionRow()])
-  }
-
   const addConnectionDraftRow = () => {
     setConnectionDraftRows((prev) => [...prev, createConnectionRow()])
   }
@@ -431,14 +443,14 @@ export default function CompanyAdminConnectCombinationPage() {
           ? responseState.existingConnections
           : fallbackConnections,
       )
-
+  
       if (responseState.companyId && !companyId) {
         setCompanyId(responseState.companyId)
       }
 
       message.success('Connections saved successfully')
       await fetchExistingConnections(fallbackConnections)
-      closeCreateModal()
+      setIsEditing(false)
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Failed to save connections')
     } finally {
@@ -595,137 +607,100 @@ export default function CompanyAdminConnectCombinationPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <PageHeader
+        title="Connect Combinations"
+        description="Map Sales combinations to PDF combinations to link your data accurately."
+        actions={
+          <Space wrap>
+            {isEditing ? (
+              <>
+                <Button onClick={resetDraft}>Clear</Button>
+                <Button onClick={() => { setIsEditing(false); restoreDrafts(); }}>Cancel</Button>
+                <Button type="primary" loading={saving} onClick={handleSave}>Save Changes</Button>
+              </>
+            ) : (
+              <Button type="primary" onClick={() => setIsEditing(true)}>Create Connection</Button>
+            )}
+          </Space>
+        }
+      />
+
+      <div style={{ marginTop: 24 }}>
+        <div style={sectionCardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div>
-              <Title level={3} style={{ margin: 0 }}>
-                Connect combinations
+              <Title level={5} style={{ margin: 0, color: 'var(--exim-gray-800)' }}>
+                {isEditing ? 'Create Connections' : 'Existing Connections'}
               </Title>
-              <Text type="secondary">
-                The UI shows combination text, but save requests send only combination IDs.
+              <Text type="secondary" style={{ fontSize: 13, display: 'block' }}>
+                {isEditing
+                  ? 'Select Sales Combination first, then PDF Combination. The request sends only the selected IDs.'
+                  : 'Saved rows show labels only, not IDs.'}
               </Text>
             </div>
-
-            <div
-              style={{
-                border: '1px solid #f0f0f0',
-                borderRadius: 16,
-                padding: 20,
-                background: 'linear-gradient(180deg, #ffffff 0%, #fafafa 100%)',
-                boxShadow: '0 10px 30px rgba(15, 23, 42, 0.04)',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  gap: 12,
-                  marginBottom: 12,
-                  flexWrap: 'wrap',
-                }}
-              >
-                <div>
-                  <Text strong style={{ display: 'block' }}>
-                    Existing Connections
-                  </Text>
-                  <Text type="secondary">Saved rows show labels only, not IDs.</Text>
-                </div>
-
-                <Space wrap>
+            <Space wrap>
+              {!isEditing ? (
+                <>
                   <Tag color="blue">Sales: {salesCombinationEntries.length}</Tag>
                   <Tag color="green">PDF: {pdfCombinationEntries.length}</Tag>
                   <Tag>Connected: {savedConnectionRows.length}</Tag>
-                  <Button type="primary" onClick={openCreateModal} disabled={!hasBuildData}>
-                    Create Connection
-                  </Button>
-                </Space>
-              </div>
-
-              {!hasBuildData && !loading ? (
-                <Text type="warning">
-                  No combinations found. Create Sales and PDF combinations first on the Combinations page.
-                </Text>
-              ) : null}
-
-              <Table
-                size="small"
-                loading={loading}
-                pagination={false}
-                columns={savedConnectionColumns}
-                dataSource={savedConnectionRows}
-                locale={{ emptyText: 'No saved connections yet' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-              <Button onClick={() => navigate('/admin/combination')}>Back to Combinations</Button>
-            </div>
-          </Space>
-        
-
-      <Modal
-        open={open}
-        onCancel={closeCreateModal}
-        footer={null}
-        width="92vw"
-        style={{ top: 24, maxWidth: 1200 }}
-        destroyOnClose
-      >
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <div>
-            <Title level={4} style={{ margin: 0 }}>
-              Create Connections
-            </Title>
-            <Text type="secondary">
-              Select <b>Sales Combination</b> first, then <b>PDF Combination</b>. The request sends
-              only the selected IDs.
-            </Text>
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              gap: 12,
-              flexWrap: 'wrap',
-            }}
-          >
-            <Space wrap>
-              <Tag color="blue">Sales options: {salesConnectionOptions.length}</Tag>
-              <Tag color="green">PDF options: {pdfConnectionOptions.length}</Tag>
+                </>
+              ) : (
+                <>
+                  <Tag color="blue">Sales options: {salesConnectionOptions.length}</Tag>
+                  <Tag color="green">PDF options: {pdfConnectionOptions.length}</Tag>
+                </>
+              )}
+              {isEditing && (
+                <Button onClick={addConnectionDraftRow} disabled={!hasBuildData}>
+                  + Add Connection
+                </Button>
+              )}
             </Space>
-
-            <Button onClick={addConnectionDraftRow} disabled={!hasBuildData}>
-              + Add Connection
-            </Button>
           </div>
 
-          {connectionDraftRows.some((row) => row.matchDuplicate) ? (
+          {!hasBuildData && !loading && !isEditing ? (
             <Alert
+              title="No combinations found"
+              description="Create Sales and PDF combinations first on the Combinations page before configuring connections."
               type="warning"
               showIcon
-              message="Matching duplicate rows"
-              description="Checked connections match rows when the combination value is the same on Sales and PDF and the duplicate count is equal on both sides. You can enable this on multiple connection rows; unmatched rows are left for the next rules."
+              style={{ marginBottom: 16 }}
             />
           ) : null}
 
-          <Table
-            size="small"
-            pagination={false}
-            columns={connectionTableColumns}
-            dataSource={connectionDraftRows.map((row) => ({ ...row, key: row.id }))}
-            locale={{ emptyText: 'No connection rows' }}
-          />
+          {isEditing && connectionDraftRows.some((row) => row.matchDuplicate) ? (
+            <Alert
+              type="warning"
+              showIcon
+              title="Matching duplicate rows"
+              description="Checked connections match rows when the combination value is the same on Sales and PDF and the duplicate count is equal on both sides."
+              style={{ marginBottom: 16 }}
+            />
+          ) : null}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-            <Button onClick={closeCreateModal}>Cancel</Button>
-            <Button type="primary" loading={saving} disabled={!BACKEND_URL || !hasBuildData} onClick={handleSave}>
-              Save Connections
-            </Button>
-          </div>
-        </Space>
-      </Modal>
+          {isEditing ? (
+            <Table
+              size="small"
+              pagination={false}
+              columns={connectionTableColumns}
+              dataSource={connectionDraftRows.map((row) => ({ ...row, key: row.id }))}
+              locale={{ emptyText: 'No connection rows' }}
+              scroll={{ x: 800 }}
+            />
+          ) : (
+            <Table
+              size="small"
+              loading={loading}
+              pagination={false}
+              columns={savedConnectionColumns}
+              dataSource={savedConnectionRows}
+              locale={{ emptyText: 'No mapped connections yet' }}
+              scroll={{ x: 600 }}
+            />
+          )}
+        </div>
+      </div>
     </AppShell>
   )
 }
