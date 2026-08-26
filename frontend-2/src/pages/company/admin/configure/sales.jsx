@@ -1,4 +1,4 @@
-import { Button, Input, Layout, Space, Tag, Typography, message, Row, Col } from 'antd'
+import { Button, Input, Layout, Space, Tag, Typography, message, Row, Col, Skeleton, Divider, Badge } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
@@ -218,17 +218,22 @@ export default function CompanyAdminConfigureSalesPage() {
               </Text>
             </div>
             {configured != null && !isEditing && (
-              <Tag color={configured ? 'green' : 'default'} style={{ margin: 0 }}>
-                {configured ? 'Configured' : 'Not configured'}
-              </Tag>
+              <div style={{ padding: '4px 12px', background: configured ? '#f6ffed' : '#fffbe6', border: `1px solid ${configured ? '#b7eb8f' : '#ffe58f'}`, borderRadius: 4 }}>
+                <Badge status={configured ? "success" : "warning"} text={configured ? 'Configured' : 'Not configured'} />
+              </div>
             )}
           </div>
 
-          {!isEditing ? (
+          {loading ? (
+            <Skeleton active paragraph={{ rows: 5 }} />
+          ) : !isEditing ? (
             <Row gutter={[24, 24]}>
+              <Col span={24}>
+                 <Divider orientation="left" style={{ margin: 0, fontSize: 14 }}>Authentication</Divider>
+              </Col>
               <Col xs={24} md={12} lg={8}>
                 <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>SAP USER ID</Text>
-                <Text strong>{userId || '-'}</Text>
+                <Text strong copyable={!!userId}>{userId || '-'}</Text>
               </Col>
               <Col xs={24} md={12} lg={8}>
                 <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>PASSWORD</Text>
@@ -236,19 +241,26 @@ export default function CompanyAdminConfigureSalesPage() {
               </Col>
               <Col xs={24} md={12} lg={8}>
                 <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>SAP CONNECTION</Text>
-                <Text strong>{sapConnection || '-'}</Text>
+                <Text strong copyable={!!sapConnection}>{sapConnection || '-'}</Text>
+              </Col>
+
+              <Col span={24}>
+                 <Divider orientation="left" style={{ marginTop: 8, marginBottom: 0, fontSize: 14 }}>Transaction Codes</Divider>
               </Col>
               <Col xs={24} md={12} lg={8}>
                 <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>SALES TCODE</Text>
-                <Tag>{reportTcode || '-'}</Tag>
+                <Text strong copyable={!!reportTcode}>{reportTcode || '-'}</Text>
               </Col>
               <Col xs={24} md={12} lg={8}>
                 <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>JV UPLOAD TCODE</Text>
-                <Tag>{uploadTcode || '-'}</Tag>
+                <Text strong copyable={!!uploadTcode}>{uploadTcode || '-'}</Text>
               </Col>
             </Row>
           ) : (
             <Row gutter={[24, 24]} style={{ maxWidth: 800 }}>
+              <Col xs={24}>
+                 <Divider orientation="left" style={{ margin: 0, marginBottom: 16, fontSize: 14 }}>Authentication</Divider>
+              </Col>
               <Col xs={24} md={12}>
                 <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 13 }}>
                   SAP user ID
@@ -284,6 +296,10 @@ export default function CompanyAdminConfigureSalesPage() {
                   autoComplete="off"
                   disabled={saving}
                 />
+              </Col>
+
+              <Col xs={24}>
+                 <Divider orientation="left" style={{ margin: 0, marginBottom: 16, fontSize: 14 }}>Transaction Codes</Divider>
               </Col>
               <Col xs={24} md={12}>
                 <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 13 }}>
