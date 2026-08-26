@@ -1,12 +1,19 @@
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, Card, Input, InputNumber, Layout, Space, Tag, Typography, message } from 'antd'
+import { Button, Input, InputNumber, Space, Tag, Typography, message, Row, Col, Skeleton, Badge } from 'antd'
 import { useCallback, useEffect, useState } from 'react'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
 
-const { Content } = Layout
 const { Title, Text } = Typography
+
+const sectionCardStyle = {
+  background: '#ffffff',
+  borderRadius: 8,
+  padding: 24,
+  boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 1px 6px -1px rgba(0,0,0,0.02)',
+  borderTop: '4px solid #1677ff',
+}
 
 const CONFIGURE_DGFT_BASE = '/api/company/admin/configure/dgft'
 
@@ -17,11 +24,17 @@ export default function CompanyAdminConfigureDgftPage() {
   const [password, setPassword] = useState('')
   const [maxLoginRetries, setMaxLoginRetries] = useState(8)
   const [configured, setConfigured] = useState(null)
+  
   const [alertEmails, setAlertEmails] = useState([''])
   const [loadingAlertEmails, setLoadingAlertEmails] = useState(false)
   const [savingAlertEmails, setSavingAlertEmails] = useState(false)
+  
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  
+  // UI states
+  const [isEditingCreds, setIsEditingCreds] = useState(false)
+  const [isEditingAlerts, setIsEditingAlerts] = useState(false)
 
   const loadCredentials = useCallback(async () => {
     if (!BACKEND_URL) return
@@ -95,6 +108,7 @@ export default function CompanyAdminConfigureDgftPage() {
       const saved = Array.isArray(data.emails) ? data.emails : list
       setAlertEmails(saved.length ? saved : [''])
       message.success(data?.message || 'Password alert emails saved.')
+      setIsEditingAlerts(false)
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Failed to save alert emails')
     } finally {
@@ -139,12 +153,23 @@ export default function CompanyAdminConfigureDgftPage() {
       } else {
         setConfigured(true)
       }
+      setIsEditingCreds(false)
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Failed to save DGFT credentials')
     } finally {
       setSaving(false)
     }
   }, [BACKEND_URL, userId, password, maxLoginRetries])
+
+  const handleCancelCreds = () => {
+    setIsEditingCreds(false)
+    loadCredentials()
+  }
+
+  const handleCancelAlerts = () => {
+    setIsEditingAlerts(false)
+    loadAlertEmails()
+  }
 
   useEffect(() => {
     loadCredentials()
@@ -153,86 +178,158 @@ export default function CompanyAdminConfigureDgftPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <div>
-              <Title level={3} style={{ margin: 0 }}>
-                DGFT credentials
-              </Title>
-              <Text type="secondary">
-                Store DGFT login used for automated DGFT process runs.
-              </Text>
+      <PageHeader 
+        title="DGFT Setup" 
+        description="Store DGFT logins used for automated DGFT process runs and configure password failure alerts."
+      />
+
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+          
+          {/* DGFT Credentials Section */}
+          <div style={sectionCardStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <Title level={5} style={{ margin: 0, color: 'var(--exim-gray-800)' }}>
+                    {isEditingCreds ? 'Configure DGFT Credentials' : 'Active DGFT Credentials'}
+                  </Title>
+                  {!isEditingCreds && configured != null && (
+                    configured 
+                      ? <Badge status="success" text="Configured" style={{ padding: '2px 8px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 12, fontSize: 12 }} />
+                      : <Badge status="warning" text="Not configured" style={{ padding: '2px 8px', background: '#fffbe6', border: '1px solid #ffe58f', borderRadius: 12, fontSize: 12 }} />
+                  )}
+                </div>
+                <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 4 }}>
+                  {isEditingCreds 
+                    ? 'Update the DGFT username and password below.' 
+                    : 'Current DGFT credentials for automated processing.'}
+                </Text>
+              </div>
+              <Space wrap>
+                {!isEditingCreds && (
+                  <Button onClick={loadCredentials} loading={loading}>Reload</Button>
+                )}
+                {!isEditingCreds && (
+                  <Button type="primary" onClick={() => setIsEditingCreds(true)}>Modify Configuration</Button>
+                )}
+              </Space>
             </div>
 
-            {configured != null ? (
-              <div>
-                <Text type="secondary">Status: </Text>
-                <Tag color={configured ? 'green' : 'default'}>
-                  {configured ? 'Configured' : 'Not configured'}
-                </Tag>
-              </div>
-            ) : null}
-
-            <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-              <div>
-                <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-                  DGFT user ID
-                </Text>
-                <Input
-                  value={userId}
-                  onChange={(e) => setUserId(e.target.value)}
-                  placeholder="DGFT username"
-                  autoComplete="off"
-                  disabled={loading || saving}
-                />
-              </div>
-              <div>
-                <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-                  Password
-                </Text>
-                <Input.Password
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="DGFT password"
-                  autoComplete="new-password"
-                  disabled={loading || saving}
-                />
-              </div>
-              <div>
-                <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-                  Max login retries
-                </Text>
-                <InputNumber
-                  value={maxLoginRetries}
-                  min={1}
-                  max={20}
-                  onChange={(v) => setMaxLoginRetries(Number(v || 8))}
-                  style={{ width: '100%' }}
-                  disabled={loading || saving}
-                />
-              </div>
-
-              <Space wrap>
-                <Button type="primary" loading={saving} onClick={handleSave} disabled={!BACKEND_URL}>
-                  Save & verify
-                </Button>
-                <Button onClick={loadCredentials} loading={loading} disabled={!BACKEND_URL}>
-                  Reload
-                </Button>
+            {loading && !isEditingCreds ? (
+              <Skeleton active paragraph={{ rows: 2 }} />
+            ) : !isEditingCreds ? (
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <Row gutter={[24, 24]}>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>DGFT USER ID</Text>
+                    <Text strong copyable={!!userId}>{userId || '—'}</Text>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>PASSWORD</Text>
+                    <Text strong>{password ? '••••••••••••' : '—'}</Text>
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>MAX LOGIN RETRIES</Text>
+                    <Text strong>{maxLoginRetries}</Text>
+                  </Col>
+                </Row>
+                <div style={{ marginTop: 16 }}>
+                  <Text type="secondary" style={{ fontSize: 12 }}>
+                    For one-off manual runs with a different account, use DGFT Manual under the DGFT menu.
+                  </Text>
+                </div>
               </Space>
-
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                For one-off manual runs with a different account, use DGFT Manual under the DGFT menu.
-              </Text>
-            </Space>
-
-            <Card size="small" title="Password wrong alert emails" loading={loadingAlertEmails}>
-              <Space direction="vertical" size="middle" style={{ width: '100%', maxWidth: 520 }}>
-                <Text type="secondary">
-                  When DGFT login fails due to a wrong password, an alert is sent to these email
-                  addresses.
+            ) : (
+              <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+                <Row gutter={[24, 24]}>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>DGFT User ID</Text>
+                    <Input
+                      value={userId}
+                      onChange={(e) => setUserId(e.target.value)}
+                      placeholder="DGFT username"
+                      autoComplete="off"
+                      disabled={saving}
+                    />
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Password</Text>
+                    <Input.Password
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="DGFT password"
+                      autoComplete="new-password"
+                      disabled={saving}
+                    />
+                  </Col>
+                  <Col xs={24} md={12}>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Max login retries</Text>
+                    <InputNumber
+                      value={maxLoginRetries}
+                      min={1}
+                      max={20}
+                      onChange={(v) => setMaxLoginRetries(Number(v || 8))}
+                      style={{ width: '100%' }}
+                      disabled={saving}
+                    />
+                  </Col>
+                </Row>
+                <Space wrap style={{ marginTop: 16 }}>
+                  <Button onClick={handleCancelCreds}>Cancel</Button>
+                  <Button type="primary" loading={saving} onClick={handleSave} disabled={!BACKEND_URL}>Save & verify</Button>
+                  <Button onClick={loadCredentials} loading={loading} disabled={saving || !BACKEND_URL}>Reload</Button>
+                </Space>
+                <Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 8 }}>
+                  For one-off manual runs with a different account, use DGFT Manual under the DGFT menu.
                 </Text>
+              </Space>
+            )}
+          </div>
+
+          {/* Password Alerts Section */}
+          <div style={sectionCardStyle}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
+              <div>
+                <Title level={5} style={{ margin: 0, color: 'var(--exim-gray-800)' }}>
+                  {isEditingAlerts ? 'Configure Password Alerts' : 'Active Password Alerts'}
+                </Title>
+                <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 4 }}>
+                  {isEditingAlerts 
+                    ? 'Update the email addresses that receive failed login alerts.' 
+                    : 'When DGFT login fails due to a wrong password, an alert is sent to these addresses.'}
+                </Text>
+              </div>
+              <Space wrap>
+                {!isEditingAlerts && (
+                  <Button onClick={loadAlertEmails} loading={loadingAlertEmails}>Reload</Button>
+                )}
+                {!isEditingAlerts && (
+                  <Button type="primary" onClick={() => setIsEditingAlerts(true)}>Modify Configuration</Button>
+                )}
+              </Space>
+            </div>
+
+            {loadingAlertEmails && !isEditingAlerts ? (
+              <Skeleton active paragraph={{ rows: 2 }} />
+            ) : !isEditingAlerts ? (
+              <Row gutter={[24, 24]}>
+                <Col span={24}>
+                  <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>ALERT EMAILS</Text>
+                  {alertEmails.length && alertEmails[0] !== '' ? (
+                    <Space wrap>
+                      {alertEmails.filter(e => e.trim()).map((email, idx) => (
+                        <Tag key={`email-${idx}`} style={{ padding: '4px 12px', fontSize: 13 }}>{email}</Tag>
+                      ))}
+                    </Space>
+                  ) : (
+                    <Text strong>—</Text>
+                  )}
+                </Col>
+              </Row>
+            ) : (
+              <Space direction="vertical" size="middle" style={{ width: '100%', maxWidth: 520 }}>
                 {alertEmails.map((email, index) => (
-                  <Space key={`dgft-alert-email-${index}`} align="baseline" style={{ width: '100%' }}>
+                  <Space key={`dgft-alert-email-${index}`} align="baseline" style={{ display: 'flex', width: '100%' }}>
                     <Input
                       value={email}
                       onChange={(e) =>
@@ -241,8 +338,8 @@ export default function CompanyAdminConfigureDgftPage() {
                         )
                       }
                       placeholder="alert@company.com"
-                      style={{ minWidth: 280 }}
-                      disabled={loadingAlertEmails || savingAlertEmails}
+                      style={{ width: 320 }}
+                      disabled={savingAlertEmails}
                     />
                     <Button
                       type="text"
@@ -254,20 +351,21 @@ export default function CompanyAdminConfigureDgftPage() {
                           return next.length ? next : ['']
                         })
                       }
-                      disabled={alertEmails.length <= 1 || loadingAlertEmails || savingAlertEmails}
+                      disabled={alertEmails.length <= 1 || savingAlertEmails}
                     />
                   </Space>
                 ))}
                 <Button
                   type="dashed"
-                  block
                   icon={<PlusOutlined />}
                   onClick={() => setAlertEmails((prev) => [...prev, ''])}
-                  disabled={loadingAlertEmails || savingAlertEmails}
+                  disabled={savingAlertEmails}
+                  style={{ width: 320 }}
                 >
-                  Add email
+                  Add Email
                 </Button>
-                <Space wrap>
+                <Space wrap style={{ marginTop: 16 }}>
+                  <Button onClick={handleCancelAlerts}>Cancel</Button>
                   <Button
                     type="primary"
                     loading={savingAlertEmails}
@@ -276,13 +374,15 @@ export default function CompanyAdminConfigureDgftPage() {
                   >
                     Save alert emails
                   </Button>
-                  <Button onClick={loadAlertEmails} loading={loadingAlertEmails} disabled={!BACKEND_URL}>
+                  <Button onClick={loadAlertEmails} loading={loadingAlertEmails} disabled={savingAlertEmails || !BACKEND_URL}>
                     Reload alerts
                   </Button>
                 </Space>
               </Space>
-            </Card>
-          </Space>
-        </AppShell>
+            )}
+          </div>
+
+        </Space>
+    </AppShell>
   )
 }

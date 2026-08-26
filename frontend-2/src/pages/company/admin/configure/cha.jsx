@@ -204,8 +204,8 @@ function ChaCredentialsTab({ backendUrl }) {
             )}
           </div>
           <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 4 }}>
-            {isEditing 
-              ? 'Update ICEGATE login sections and GST numbers.' 
+            {isEditing
+              ? 'Update ICEGATE login sections and GST numbers.'
               : 'Current ICEGATE sections for CHA automation.'}
           </Text>
         </div>
@@ -231,29 +231,29 @@ function ChaCredentialsTab({ backendUrl }) {
               const gstList = Array.isArray(sec.gstNumbers) ? sec.gstNumbers : []
               return (
                 <div key={`section-${idx}`} style={{ padding: 16, background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8 }}>
-                   <Title level={5} style={{ marginTop: 0, marginBottom: 16, fontSize: 14 }}>Section {idx + 1}</Title>
-                   <Row gutter={[24, 24]}>
-                     <Col xs={24} md={12}>
-                        <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>USER ID / EMAIL</Text>
-                        <Text strong copyable>{sec.email ?? sec.userId ?? sec.user_id ?? '—'}</Text>
-                     </Col>
-                     <Col xs={24} md={12}>
-                        <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>PASSWORD</Text>
-                        <Text strong>{sec.password ? '••••••••••••' : '—'}</Text>
-                     </Col>
-                     <Col span={24}>
-                        <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>GST NUMBERS</Text>
-                        {gstList.length ? (
-                          <Space wrap>
-                            {gstList.map((g, i) => (
-                              <Text strong key={`gst-${idx}-${i}`} copyable>{String(g)}</Text>
-                            ))}
-                          </Space>
-                        ) : (
-                          <Text strong>—</Text>
-                        )}
-                     </Col>
-                   </Row>
+                  <Title level={5} style={{ marginTop: 0, marginBottom: 16, fontSize: 14 }}>Section {idx + 1}</Title>
+                  <Row gutter={[24, 24]}>
+                    <Col xs={24} md={12}>
+                      <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>USER ID / EMAIL</Text>
+                      <Text strong copyable>{sec.email ?? sec.userId ?? sec.user_id ?? '—'}</Text>
+                    </Col>
+                    <Col xs={24} md={12}>
+                      <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>PASSWORD</Text>
+                      <Text strong>{sec.password ? '••••••••••••' : '—'}</Text>
+                    </Col>
+                    <Col span={24}>
+                      <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>GST NUMBERS</Text>
+                      {gstList.length ? (
+                        <Space wrap>
+                          {gstList.map((g, i) => (
+                            <Text strong key={`gst-${idx}-${i}`} copyable>{String(g)}</Text>
+                          ))}
+                        </Space>
+                      ) : (
+                        <Text strong>—</Text>
+                      )}
+                    </Col>
+                  </Row>
                 </div>
               )
             })}
@@ -420,8 +420,8 @@ function ChaOtpTab({ backendUrl }) {
             {isEditing ? 'Configure Gmail OTP Settings' : 'Active Gmail OTP Configuration'}
           </Title>
           <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 4 }}>
-            {isEditing 
-              ? 'Update OAuth app credentials below.' 
+            {isEditing
+              ? 'Update OAuth app credentials below.'
               : 'Current OAuth details for the Gmail OTP mailbox.'}
           </Text>
         </div>
@@ -506,8 +506,8 @@ function ChaOtpTab({ backendUrl }) {
             {isEditing ? 'Configure Outlook OTP Settings' : 'Active Outlook OTP Configuration'}
           </Title>
           <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 4 }}>
-            {isEditing 
-              ? 'Update Microsoft Graph app credentials below.' 
+            {isEditing
+              ? 'Update Microsoft Graph app credentials below.'
               : 'Current Graph app details for the Outlook OTP mailbox.'}
           </Text>
         </div>
@@ -704,8 +704,8 @@ function ChaPasswordAlertTab({ backendUrl }) {
             {isEditing ? 'Configure Password Alerts' : 'Active Password Alerts'}
           </Title>
           <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 4 }}>
-            {isEditing 
-              ? 'Update the email addresses that receive failed login alerts.' 
+            {isEditing
+              ? 'Update the email addresses that receive failed login alerts.'
               : 'When CHA / ICEGATE login fails due to a wrong password, an alert is sent to these addresses.'}
           </Text>
         </div>
@@ -792,13 +792,11 @@ export default function CompanyAdminConfigureChaPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-      <PageHeader 
-        title="CHA Setup" 
+      <PageHeader
+        title="CHA Setup"
         description="Configure ICEGATE logins and OTP provider settings for Custom House Agent process automation."
       />
-      <div style={{ padding: '0 24px 24px 24px' }}>
-        <Tabs items={tabItems} size="large" />
-      </div>
+      <Tabs items={tabItems} size="large" />
     </AppShell>
   )
 }
