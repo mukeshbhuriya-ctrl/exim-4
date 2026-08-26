@@ -1,33 +1,47 @@
-import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import {
-  Alert,
+  MinusCircleOutlined,
+  PlusOutlined,
+  GoogleOutlined,
+  WindowsOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons'
+import {
   Button,
   Card,
-  Descriptions,
   Divider,
   Input,
   Layout,
-  Modal,
-  Segmented,
   Space,
   Tabs,
-  Tag,
   Typography,
   message,
+  Row,
+  Col,
+  Skeleton,
+  Badge,
+  Tag,
 } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
 
-const { Content, Sider } = Layout
+const { Content } = Layout
 const { Title, Text } = Typography
+
+const sectionCardStyle = {
+  background: '#ffffff',
+  borderRadius: 8,
+  padding: 24,
+  boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 1px 6px -1px rgba(0,0,0,0.02)',
+  borderTop: '4px solid #1677ff',
+}
 
 const CONFIGURE_CHA_BASE = '/api/company/admin/configure/cha'
 
 const OTP_PROVIDERS = [
-  { value: 'gmail', label: 'Gmail' },
-  { value: 'outlook', label: 'Outlook' },
+  { value: 'gmail', label: 'Gmail', icon: <GoogleOutlined /> },
+  { value: 'outlook', label: 'Outlook', icon: <WindowsOutlined /> },
 ]
 
 function newSectionId() {
@@ -58,30 +72,10 @@ function normalizeChaFromGet(payload) {
 function ChaCredentialsTab({ backendUrl }) {
   const [loadingList, setLoadingList] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [chaRecord, setChaRecord] = useState(null)
   const [getSuccess, setGetSuccess] = useState(false)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [isEditMode, setIsEditMode] = useState(false)
+  const [chaRecord, setChaRecord] = useState(null)
+  const [isEditing, setIsEditing] = useState(false)
   const [sections, setSections] = useState([emptySection()])
-
-  const resetModal = useCallback(() => {
-    setSections([emptySection()])
-    setIsEditMode(false)
-    setModalOpen(false)
-  }, [])
-
-  const openAddModal = useCallback(() => {
-    setSections([emptySection()])
-    setIsEditMode(false)
-    setModalOpen(true)
-  }, [])
-
-  const openEditModal = useCallback(() => {
-    const apiSections = Array.isArray(chaRecord?.sections) ? chaRecord.sections : []
-    setSections(apiSections.length ? apiSections.map(sectionFromApi) : [emptySection()])
-    setIsEditMode(true)
-    setModalOpen(true)
-  }, [chaRecord])
 
   const fetchCredentials = useCallback(async () => {
     if (!backendUrl) return
@@ -109,6 +103,17 @@ function ChaCredentialsTab({ backendUrl }) {
   useEffect(() => {
     fetchCredentials()
   }, [fetchCredentials])
+
+  const handleEdit = useCallback(() => {
+    const apiSections = Array.isArray(chaRecord?.sections) ? chaRecord.sections : []
+    setSections(apiSections.length ? apiSections.map(sectionFromApi) : [emptySection()])
+    setIsEditing(true)
+  }, [chaRecord])
+
+  const handleCancel = useCallback(() => {
+    setSections([emptySection()])
+    setIsEditing(false)
+  }, [])
 
   const addSection = () => setSections((prev) => [...prev, emptySection()])
   const removeSection = (id) =>
@@ -172,7 +177,7 @@ function ChaCredentialsTab({ backendUrl }) {
         throw new Error(data?.detail || data?.message || `Save failed (${res.status})`)
       }
       message.success(data?.message || 'Credentials saved.')
-      resetModal()
+      setIsEditing(false)
       await fetchCredentials()
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Failed to save credentials')
@@ -187,275 +192,131 @@ function ChaCredentialsTab({ backendUrl }) {
   }, [chaRecord])
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Text type="secondary">ICEGATE login sections and GST numbers for CHA automation.</Text>
-      <Space wrap>
-        {sectionsFromApi.length ? (
-          <Button type="primary" onClick={openEditModal}>
-            Edit credentials
-          </Button>
-        ) : (
-          <Button type="primary" onClick={openAddModal}>
-            Add credentials
-          </Button>
-        )}
-        <Button onClick={fetchCredentials} loading={loadingList}>
-          Refresh
-        </Button>
-      </Space>
-      <div>
-        <Space align="center" style={{ marginBottom: 12 }}>
-          <Title level={5} style={{ margin: 0 }}>
-            Sections
-          </Title>
-          {getSuccess ? <Tag color="success">loaded</Tag> : null}
+    <div style={sectionCardStyle}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Title level={5} style={{ margin: 0, color: 'var(--exim-gray-800)' }}>
+              {isEditing ? 'Configure ICEGATE Credentials' : 'Active ICEGATE Credentials'}
+            </Title>
+            {!isEditing && getSuccess && (
+              <Badge status="success" text="loaded" style={{ padding: '2px 8px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 12, fontSize: 12 }} />
+            )}
+          </div>
+          <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 4 }}>
+            {isEditing 
+              ? 'Update ICEGATE login sections and GST numbers.' 
+              : 'Current ICEGATE sections for CHA automation.'}
+          </Text>
+        </div>
+        <Space wrap>
+          {!isEditing && (
+            <Button onClick={fetchCredentials} loading={loadingList}>Reload</Button>
+          )}
+          {!isEditing && (
+            <Button type="primary" onClick={handleEdit}>Modify Configuration</Button>
+          )}
         </Space>
-        {loadingList ? (
-          <Text type="secondary">Loading…</Text>
-        ) : chaRecord ? (
+      </div>
+
+      {loadingList ? (
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Skeleton active paragraph={{ rows: 2 }} />
+          <Skeleton active paragraph={{ rows: 2 }} />
+        </Space>
+      ) : !isEditing ? (
+        sectionsFromApi.length ? (
           <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-            {sectionsFromApi.length ? (
-              sectionsFromApi.map((sec, idx) => {
-                const gstList = Array.isArray(sec.gstNumbers) ? sec.gstNumbers : []
-                return (
-                  <Card key={`section-${idx}`} size="small" title={`Section ${idx + 1}`} style={{ maxWidth: 720 }}>
-                    <Descriptions bordered size="small" column={1}>
-                      <Descriptions.Item label="User ID / Email">
-                        {sec.email ?? sec.userId ?? sec.user_id ?? '—'}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="Password">
-                        {sec.password != null ? (
-                          <Text code copyable>
-                            {String(sec.password)}
-                          </Text>
-                        ) : (
-                          '—'
-                        )}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="GST numbers">
+            {sectionsFromApi.map((sec, idx) => {
+              const gstList = Array.isArray(sec.gstNumbers) ? sec.gstNumbers : []
+              return (
+                <div key={`section-${idx}`} style={{ padding: 16, background: '#fafafa', border: '1px solid #f0f0f0', borderRadius: 8 }}>
+                   <Title level={5} style={{ marginTop: 0, marginBottom: 16, fontSize: 14 }}>Section {idx + 1}</Title>
+                   <Row gutter={[24, 24]}>
+                     <Col xs={24} md={12}>
+                        <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>USER ID / EMAIL</Text>
+                        <Text strong copyable>{sec.email ?? sec.userId ?? sec.user_id ?? '—'}</Text>
+                     </Col>
+                     <Col xs={24} md={12}>
+                        <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>PASSWORD</Text>
+                        <Text strong>{sec.password ? '••••••••••••' : '—'}</Text>
+                     </Col>
+                     <Col span={24}>
+                        <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>GST NUMBERS</Text>
                         {gstList.length ? (
                           <Space wrap>
                             {gstList.map((g, i) => (
-                              <Tag key={`gst-${idx}-${i}`}>{String(g)}</Tag>
+                              <Text strong key={`gst-${idx}-${i}`} copyable>{String(g)}</Text>
                             ))}
                           </Space>
                         ) : (
-                          '—'
+                          <Text strong>—</Text>
                         )}
-                      </Descriptions.Item>
-                    </Descriptions>
-                  </Card>
-                )
-              })
-            ) : (
-              <Text type="secondary">No sections on this record.</Text>
-            )}
+                     </Col>
+                   </Row>
+                </div>
+              )
+            })}
           </Space>
         ) : (
-          <Text type="secondary">No CHA credentials yet.</Text>
-        )}
-      </div>
-
-      <Modal
-        title={isEditMode ? 'Edit CHA credentials' : 'Add CHA credentials'}
-        open={modalOpen}
-        onCancel={resetModal}
-        width={720}
-        okText="Save"
-        confirmLoading={saving}
-        onOk={handleSave}
-        destroyOnClose
-      >
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          {isEditMode ? (
-            <Alert
-              type="info"
-              showIcon
-              message="Existing credentials are pre-filled. Update fields and save to apply changes."
-            />
-          ) : null}
+          <div style={{ padding: '24px', textAlign: 'center', background: '#fafafa', border: '1px dashed #d9d9d9', borderRadius: 8 }}>
+            <Text type="secondary">No CHA credentials configured yet.</Text>
+          </div>
+        )
+      ) : (
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
           {sections.map((section, sectionIndex) => (
-            <Card
-              key={section.id}
-              size="small"
-              title={`Section ${sectionIndex + 1}`}
-              extra={
-                sections.length > 1 ? (
-                  <Button type="link" danger size="small" onClick={() => removeSection(section.id)}>
-                    Remove section
-                  </Button>
-                ) : null
-              }
-            >
-              <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                <div>
-                  <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-                    User ID / Email
-                  </Text>
-                  <Input
-                    value={section.email}
-                    onChange={(e) => updateSection(section.id, { email: e.target.value })}
-                    placeholder="ICEGATE user ID or email"
-                  />
-                </div>
-                <Input.Password
-                  value={section.password}
-                  onChange={(e) => updateSection(section.id, { password: e.target.value })}
-                  placeholder="Password"
-                />
-                <Divider orientationMargin={0} plain>
-                  GST numbers
-                </Divider>
-                {section.gstNumbers.map((gst, gi) => (
-                  <Space key={`${section.id}-gst-${gi}`} align="baseline">
-                    <Input
-                      style={{ minWidth: 200 }}
-                      value={gst}
-                      onChange={(e) => setGstAt(section.id, gi, e.target.value)}
-                      placeholder="15-character GSTIN"
-                    />
-                    <Button
-                      type="text"
-                      danger
-                      icon={<MinusCircleOutlined />}
-                      onClick={() => removeGstRow(section.id, gi)}
-                      disabled={section.gstNumbers.length <= 1}
-                    />
+            <div key={section.id} style={{ padding: 16, background: '#fafafa', border: '1px solid #d9d9d9', borderRadius: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <Title level={5} style={{ margin: 0, fontSize: 14 }}>Section {sectionIndex + 1}</Title>
+                {sections.length > 1 && (
+                  <Button type="text" danger size="small" onClick={() => removeSection(section.id)}>Remove Section</Button>
+                )}
+              </div>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} md={12}>
+                  <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>User ID / Email</Text>
+                  <Input value={section.email} onChange={(e) => updateSection(section.id, { email: e.target.value })} placeholder="ICEGATE user ID or email" />
+                </Col>
+                <Col xs={24} md={12}>
+                  <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Password</Text>
+                  <Input.Password value={section.password} onChange={(e) => updateSection(section.id, { password: e.target.value })} placeholder="Password" />
+                </Col>
+                <Col span={24}>
+                  <Divider orientation="left" style={{ margin: 0, fontSize: 13 }}>GST Numbers</Divider>
+                </Col>
+                <Col span={24}>
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    {section.gstNumbers.map((gst, gi) => (
+                      <Space key={`${section.id}-gst-${gi}`} align="baseline" style={{ display: 'flex' }}>
+                        <Input style={{ minWidth: 280 }} value={gst} onChange={(e) => setGstAt(section.id, gi, e.target.value)} placeholder="15-character GSTIN" />
+                        <Button type="text" danger icon={<MinusCircleOutlined />} onClick={() => removeGstRow(section.id, gi)} disabled={section.gstNumbers.length <= 1} />
+                      </Space>
+                    ))}
+                    <Button type="dashed" icon={<PlusOutlined />} onClick={() => addGstRow(section.id)} style={{ width: 280 }}>Add GST Number</Button>
                   </Space>
-                ))}
-                <Button type="dashed" block icon={<PlusOutlined />} onClick={() => addGstRow(section.id)}>
-                  Add GST number
-                </Button>
-              </Space>
-            </Card>
+                </Col>
+              </Row>
+            </div>
           ))}
-          <Button type="dashed" block icon={<PlusOutlined />} onClick={addSection}>
-            Add section
-          </Button>
+          <Button type="dashed" block icon={<PlusOutlined />} onClick={addSection}>Add Section</Button>
+          <Space wrap style={{ marginTop: 16 }}>
+            <Button onClick={handleCancel}>Cancel</Button>
+            <Button type="primary" loading={saving} onClick={handleSave}>Save configuration</Button>
+            <Button onClick={fetchCredentials} loading={loadingList} disabled={saving}>Reload</Button>
+          </Space>
         </Space>
-      </Modal>
-    </Space>
-  )
-}
-
-function GmailOtpFields({ labelsName, clientId, clientSecret, refreshToken, onChange, readOnly = false }) {
-  return (
-    <Space direction="vertical" size="small" style={{ width: '100%', maxWidth: 480 }}>
-      <div>
-        <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-          Label / folder name
-        </Text>
-        <Input
-          value={labelsName}
-          onChange={(e) => onChange?.('labelsName', e.target.value)}
-          placeholder="labelsName"
-          readOnly={readOnly}
-        />
-      </div>
-      <div>
-        <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-          Client ID
-        </Text>
-        <Input
-          value={clientId}
-          onChange={(e) => onChange?.('clientId', e.target.value)}
-          placeholder="OAuth client ID"
-          readOnly={readOnly}
-        />
-      </div>
-      <div>
-        <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-          Client Secret
-        </Text>
-        <Input.Password
-          value={clientSecret}
-          onChange={(e) => onChange?.('clientSecret', e.target.value)}
-          placeholder="OAuth client secret"
-          readOnly={readOnly}
-        />
-      </div>
-      <div>
-        <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-          Refresh Token
-        </Text>
-        <Input.Password
-          value={refreshToken}
-          onChange={(e) => onChange?.('refreshToken', e.target.value)}
-          placeholder="Refresh token"
-          readOnly={readOnly}
-        />
-      </div>
-    </Space>
-  )
-}
-
-function OutlookOtpFields({ mailboxFolder, clientId, clientSecret, tenantId, refreshToken, onChange, readOnly = false }) {
-  return (
-    <Space direction="vertical" size="small" style={{ width: '100%', maxWidth: 480 }}>
-      <div>
-        <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-          Mailbox folder
-        </Text>
-        <Input
-          value={mailboxFolder}
-          onChange={(e) => onChange?.('mailboxFolder', e.target.value)}
-          placeholder="Inbox/OTP"
-          readOnly={readOnly}
-        />
-      </div>
-      <div>
-        <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-          Application (client) ID
-        </Text>
-        <Input
-          value={clientId}
-          onChange={(e) => onChange?.('clientId', e.target.value)}
-          placeholder="Azure app client ID"
-          readOnly={readOnly}
-        />
-      </div>
-      <div>
-        <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-          Client Secret
-        </Text>
-        <Input.Password
-          value={clientSecret}
-          onChange={(e) => onChange?.('clientSecret', e.target.value)}
-          placeholder="Azure client secret"
-          readOnly={readOnly}
-        />
-      </div>
-      <div>
-        <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-          Tenant ID
-        </Text>
-        <Input
-          value={tenantId}
-          onChange={(e) => onChange?.('tenantId', e.target.value)}
-          placeholder="Azure directory (tenant) ID"
-          readOnly={readOnly}
-        />
-      </div>
-      <div>
-        <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-          Refresh Token
-        </Text>
-        <Input.Password
-          value={refreshToken}
-          onChange={(e) => onChange?.('refreshToken', e.target.value)}
-          placeholder="Refresh token"
-          readOnly={readOnly}
-        />
-      </div>
-    </Space>
+      )}
+    </div>
   )
 }
 
 function ChaOtpTab({ backendUrl }) {
-  const [modalOpen, setModalOpen] = useState(false)
+  const [selectedProvider, setSelectedProvider] = useState('gmail')
+  const [isEditing, setIsEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loadingCredentials, setLoadingCredentials] = useState(false)
-  const [selectedProvider, setSelectedProvider] = useState('gmail')
+
   const [labelsName, setLabelsName] = useState('')
   const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
@@ -469,28 +330,11 @@ function ChaOtpTab({ backendUrl }) {
   const applyCredentialData = useCallback((data) => {
     const otpcred = data?.cha?.otpcred ?? data?.otpcred
     const payload = otpcred?.payload || data?.payload || {}
-    setLabelsName(
-      String(payload?.labelsName || payload?.labels_name || payload?.filterName || '').trim(),
-    )
+    setLabelsName(String(payload?.labelsName || payload?.labels_name || payload?.filterName || '').trim())
     setClientId(String(payload?.clientId || payload?.client_id || '').trim())
     setClientSecret(String(payload?.clientSecret || payload?.client_secret || '').trim())
     setRefreshToken(String(payload?.refreshToken || payload?.refresh_token || '').trim())
   }, [])
-
-  const handleGmailFieldChange = (field, value) => {
-    if (field === 'labelsName') setLabelsName(value)
-    if (field === 'clientId') setClientId(value)
-    if (field === 'clientSecret') setClientSecret(value)
-    if (field === 'refreshToken') setRefreshToken(value)
-  }
-
-  const handleOutlookFieldChange = (field, value) => {
-    if (field === 'mailboxFolder') setOutlookMailboxFolder(value)
-    if (field === 'clientId') setOutlookClientId(value)
-    if (field === 'clientSecret') setOutlookClientSecret(value)
-    if (field === 'tenantId') setOutlookTenantId(value)
-    if (field === 'refreshToken') setOutlookRefreshToken(value)
-  }
 
   const fetchCredentials = useCallback(
     async ({ showError = true } = {}) => {
@@ -517,12 +361,9 @@ function ChaOtpTab({ backendUrl }) {
     [backendUrl, applyCredentialData],
   )
 
-  const openModal = useCallback(async () => {
-    setModalOpen(true)
-    if (selectedProvider === 'gmail') {
-      await fetchCredentials()
-    }
-  }, [fetchCredentials, selectedProvider])
+  useEffect(() => {
+    fetchCredentials({ showError: false })
+  }, [fetchCredentials])
 
   const handleSave = async () => {
     if (selectedProvider === 'outlook') {
@@ -558,7 +399,7 @@ function ChaOtpTab({ backendUrl }) {
       }
       applyCredentialData({ otpcred: { payload: body } })
       message.success(data?.message || 'OTP setup saved successfully.')
-      setModalOpen(false)
+      setIsEditing(false)
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Failed to save OTP setup')
     } finally {
@@ -566,108 +407,213 @@ function ChaOtpTab({ backendUrl }) {
     }
   }
 
-  useEffect(() => {
+  const handleCancel = () => {
+    setIsEditing(false)
     fetchCredentials({ showError: false })
-  }, [fetchCredentials])
+  }
 
-  return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Text type="secondary">OTP provider settings for CHA ICEGATE login.</Text>
-
-      <div>
-        <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-          Provider
-        </Text>
-        <Segmented
-          options={OTP_PROVIDERS}
-          value={selectedProvider}
-          onChange={(value) => setSelectedProvider(String(value))}
-        />
-      </div>
-
-      {selectedProvider === 'gmail' ? (
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <Text strong>Current Gmail OTP settings</Text>
-          <GmailOtpFields
-            labelsName={labelsName}
-            clientId={clientId}
-            clientSecret={clientSecret}
-            refreshToken={refreshToken}
-            readOnly
-          />
-          <Button type="primary" onClick={openModal} loading={loadingCredentials}>
-            Setup OTP
-          </Button>
-        </Space>
-      ) : (
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <Alert
-            type="info"
-            showIcon
-            message="Outlook OTP (preview)"
-            description="Outlook integration is not wired to the backend yet. Use the form below as a placeholder."
-          />
-          <Text strong>Outlook OTP settings</Text>
-          <OutlookOtpFields
-            mailboxFolder={outlookMailboxFolder}
-            clientId={outlookClientId}
-            clientSecret={outlookClientSecret}
-            tenantId={outlookTenantId}
-            refreshToken={outlookRefreshToken}
-            onChange={handleOutlookFieldChange}
-          />
-          <Button type="primary" onClick={openModal}>
-            Setup OTP
-          </Button>
-        </Space>
-      )}
-
-      <Modal
-        title="Setup OTP"
-        open={modalOpen}
-        onCancel={() => setModalOpen(false)}
-        onOk={handleSave}
-        okText={selectedProvider === 'outlook' ? 'Save (preview)' : 'Save'}
-        confirmLoading={saving}
-        width={560}
-        destroyOnClose
-      >
-        <Space direction="vertical" size="large" style={{ width: '100%' }}>
-          <div>
-            <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-              Provider
-            </Text>
-            <Segmented
-              options={OTP_PROVIDERS}
-              value={selectedProvider}
-              onChange={(value) => setSelectedProvider(String(value))}
-            />
-          </div>
-
-          {selectedProvider === 'gmail' ? (
-            <GmailOtpFields
-              labelsName={labelsName}
-              clientId={clientId}
-              clientSecret={clientSecret}
-              refreshToken={refreshToken}
-              onChange={handleGmailFieldChange}
-            />
-          ) : (
-            <>
-              <Alert type="warning" showIcon message="Outlook save is not enabled yet." />
-              <OutlookOtpFields
-                mailboxFolder={outlookMailboxFolder}
-                clientId={outlookClientId}
-                clientSecret={outlookClientSecret}
-                tenantId={outlookTenantId}
-                refreshToken={outlookRefreshToken}
-                onChange={handleOutlookFieldChange}
-              />
-            </>
+  const renderGmailContent = () => (
+    <div style={sectionCardStyle}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <Title level={5} style={{ margin: 0, color: 'var(--exim-gray-800)' }}>
+            {isEditing ? 'Configure Gmail OTP Settings' : 'Active Gmail OTP Configuration'}
+          </Title>
+          <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 4 }}>
+            {isEditing 
+              ? 'Update OAuth app credentials below.' 
+              : 'Current OAuth details for the Gmail OTP mailbox.'}
+          </Text>
+        </div>
+        <Space wrap>
+          {!isEditing && (
+            <Button onClick={() => fetchCredentials({ showError: true })} loading={loadingCredentials}>Reload</Button>
+          )}
+          {!isEditing && (
+            <Button type="primary" onClick={() => setIsEditing(true)}>Modify Configuration</Button>
           )}
         </Space>
-      </Modal>
-    </Space>
+      </div>
+
+      {loadingCredentials && !isEditing ? (
+        <Skeleton active paragraph={{ rows: 4 }} />
+      ) : !isEditing ? (
+        <Row gutter={[24, 24]}>
+          <Col span={24}>
+            <Divider orientation="left" style={{ margin: 0, fontSize: 14 }}>OAuth Setup</Divider>
+          </Col>
+          <Col xs={24} md={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>CLIENT ID</Text>
+            <Text strong copyable={!!clientId}>{clientId || '—'}</Text>
+          </Col>
+          <Col xs={24} md={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>CLIENT SECRET</Text>
+            <Text strong>{clientSecret ? '••••••••••••' : '—'}</Text>
+          </Col>
+          <Col xs={24} md={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>REFRESH TOKEN</Text>
+            <Text strong>{refreshToken ? '••••••••••••' : '—'}</Text>
+          </Col>
+          <Col span={24}>
+            <Divider orientation="left" style={{ marginTop: 8, marginBottom: 0, fontSize: 14 }}>Label Mapping</Divider>
+          </Col>
+          <Col xs={24} md={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>LABEL / FOLDER NAME</Text>
+            <Text strong>{labelsName || '—'}</Text>
+          </Col>
+        </Row>
+      ) : (
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Row gutter={[24, 24]}>
+            <Col span={24}>
+              <Divider orientation="left" style={{ margin: 0, fontSize: 14 }}>OAuth Setup</Divider>
+            </Col>
+            <Col xs={24} md={12}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Client ID</Text>
+              <Input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="OAuth client ID" />
+            </Col>
+            <Col xs={24} md={12}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Client Secret</Text>
+              <Input.Password value={clientSecret} onChange={(e) => setClientSecret(e.target.value)} placeholder="OAuth client secret" />
+            </Col>
+            <Col xs={24} md={12}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Refresh Token</Text>
+              <Input.Password value={refreshToken} onChange={(e) => setRefreshToken(e.target.value)} placeholder="Refresh token" />
+            </Col>
+            <Col span={24}>
+              <Divider orientation="left" style={{ margin: 0, fontSize: 14 }}>Label Mapping</Divider>
+            </Col>
+            <Col xs={24} md={12}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Label / folder name</Text>
+              <Input value={labelsName} onChange={(e) => setLabelsName(e.target.value)} placeholder="labelsName" />
+            </Col>
+          </Row>
+          <Space wrap style={{ marginTop: 16 }}>
+            <Button onClick={handleCancel}>Cancel</Button>
+            <Button type="primary" loading={saving} onClick={handleSave}>Save configuration</Button>
+            <Button onClick={() => fetchCredentials({ showError: true })} loading={loadingCredentials} disabled={saving}>Reload</Button>
+          </Space>
+        </Space>
+      )}
+    </div>
+  )
+
+  const renderOutlookContent = () => (
+    <div style={sectionCardStyle}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <Title level={5} style={{ margin: 0, color: 'var(--exim-gray-800)' }}>
+            {isEditing ? 'Configure Outlook OTP Settings' : 'Active Outlook OTP Configuration'}
+          </Title>
+          <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 4 }}>
+            {isEditing 
+              ? 'Update Microsoft Graph app credentials below.' 
+              : 'Current Graph app details for the Outlook OTP mailbox.'}
+          </Text>
+        </div>
+        <Space wrap>
+          {!isEditing && (
+            <Button onClick={() => fetchCredentials({ showError: true })} loading={loadingCredentials}>Reload</Button>
+          )}
+          {!isEditing && (
+            <Button type="primary" onClick={() => setIsEditing(true)}>Modify Configuration</Button>
+          )}
+        </Space>
+      </div>
+
+      {!isEditing && (
+        <div style={{ marginBottom: 24, padding: '12px 16px', background: '#f0f5ff', border: '1px solid #adc6ff', borderRadius: 6, display: 'flex', gap: 12 }}>
+          <InfoCircleOutlined style={{ color: '#1677ff', fontSize: 16, marginTop: 2 }} />
+          <div>
+            <Text strong style={{ fontSize: 13, display: 'block', color: '#0958d9' }}>Outlook OTP (preview)</Text>
+            <Text style={{ fontSize: 13, color: '#1677ff' }}>Outlook integration is not wired to the backend yet. Use the form below as a placeholder.</Text>
+          </div>
+        </div>
+      )}
+
+      {!isEditing ? (
+        <Row gutter={[24, 24]}>
+          <Col span={24}>
+            <Divider orientation="left" style={{ margin: 0, fontSize: 14 }}>Application Setup</Divider>
+          </Col>
+          <Col xs={24} md={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>TENANT ID</Text>
+            <Text strong copyable={!!outlookTenantId}>{outlookTenantId || '—'}</Text>
+          </Col>
+          <Col xs={24} md={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>CLIENT ID</Text>
+            <Text strong copyable={!!outlookClientId}>{outlookClientId || '—'}</Text>
+          </Col>
+          <Col xs={24} md={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>CLIENT SECRET</Text>
+            <Text strong>{outlookClientSecret ? '••••••••••••' : '—'}</Text>
+          </Col>
+          <Col xs={24} md={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>REFRESH TOKEN</Text>
+            <Text strong>{outlookRefreshToken ? '••••••••••••' : '—'}</Text>
+          </Col>
+          <Col span={24}>
+            <Divider orientation="left" style={{ marginTop: 8, marginBottom: 0, fontSize: 14 }}>Mailbox Mapping</Divider>
+          </Col>
+          <Col xs={24} md={12}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>MAILBOX FOLDER</Text>
+            <Text strong>{outlookMailboxFolder || '—'}</Text>
+          </Col>
+        </Row>
+      ) : (
+        <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Row gutter={[24, 24]}>
+            <Col span={24}>
+              <Divider orientation="left" style={{ margin: 0, fontSize: 14 }}>Application Setup</Divider>
+            </Col>
+            <Col xs={24} md={12}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Tenant ID</Text>
+              <Input value={outlookTenantId} onChange={(e) => setOutlookTenantId(e.target.value)} placeholder="Azure directory (tenant) ID" />
+            </Col>
+            <Col xs={24} md={12}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Client ID</Text>
+              <Input value={outlookClientId} onChange={(e) => setOutlookClientId(e.target.value)} placeholder="Azure app client ID" />
+            </Col>
+            <Col xs={24} md={12}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Client Secret</Text>
+              <Input.Password value={outlookClientSecret} onChange={(e) => setOutlookClientSecret(e.target.value)} placeholder="Azure client secret" />
+            </Col>
+            <Col xs={24} md={12}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Refresh Token</Text>
+              <Input.Password value={outlookRefreshToken} onChange={(e) => setOutlookRefreshToken(e.target.value)} placeholder="Refresh token" />
+            </Col>
+            <Col span={24}>
+              <Divider orientation="left" style={{ margin: 0, fontSize: 14 }}>Mailbox Mapping</Divider>
+            </Col>
+            <Col xs={24} md={12}>
+              <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Mailbox folder</Text>
+              <Input value={outlookMailboxFolder} onChange={(e) => setOutlookMailboxFolder(e.target.value)} placeholder="Inbox/OTP" />
+            </Col>
+          </Row>
+          <Space wrap style={{ marginTop: 16 }}>
+            <Button onClick={handleCancel}>Cancel</Button>
+            <Button type="primary" loading={saving} onClick={handleSave}>Save (preview)</Button>
+            <Button onClick={() => fetchCredentials({ showError: true })} loading={loadingCredentials} disabled={saving}>Reload</Button>
+          </Space>
+        </Space>
+      )}
+    </div>
+  )
+
+  return (
+    <div>
+      <Tabs
+        activeKey={selectedProvider}
+        onChange={(key) => setSelectedProvider(key)}
+        size="large"
+        items={OTP_PROVIDERS.map((provider) => ({
+          key: provider.value,
+          label: provider.label,
+          icon: provider.icon,
+          children: provider.value === 'gmail' ? renderGmailContent() : renderOutlookContent()
+        }))}
+      />
+    </div>
   )
 }
 
@@ -675,6 +621,7 @@ function ChaPasswordAlertTab({ backendUrl }) {
   const [emails, setEmails] = useState([''])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
 
   const fetchEmails = useCallback(async () => {
     if (!backendUrl) return
@@ -699,6 +646,15 @@ function ChaPasswordAlertTab({ backendUrl }) {
   }, [backendUrl])
 
   useEffect(() => {
+    fetchEmails()
+  }, [fetchEmails])
+
+  const handleEdit = useCallback(() => {
+    setIsEditing(true)
+  }, [])
+
+  const handleCancel = useCallback(() => {
+    setIsEditing(false)
     fetchEmails()
   }, [fetchEmails])
 
@@ -732,6 +688,7 @@ function ChaPasswordAlertTab({ backendUrl }) {
       const saved = Array.isArray(data.emails) ? data.emails : list
       setEmails(saved.length ? saved : [''])
       message.success(data?.message || 'Password alert emails saved.')
+      setIsEditing(false)
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Failed to save alert emails')
     } finally {
@@ -740,22 +697,54 @@ function ChaPasswordAlertTab({ backendUrl }) {
   }
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Text type="secondary">
-        Add one or more email addresses. When CHA / ICEGATE login fails due to a wrong password, an
-        alert is sent to these addresses.
-      </Text>
-      {loading ? (
-        <Text type="secondary">Loading alert emails…</Text>
+    <div style={sectionCardStyle}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24, flexWrap: 'wrap', gap: 16 }}>
+        <div>
+          <Title level={5} style={{ margin: 0, color: 'var(--exim-gray-800)' }}>
+            {isEditing ? 'Configure Password Alerts' : 'Active Password Alerts'}
+          </Title>
+          <Text type="secondary" style={{ fontSize: 13, display: 'block', marginTop: 4 }}>
+            {isEditing 
+              ? 'Update the email addresses that receive failed login alerts.' 
+              : 'When CHA / ICEGATE login fails due to a wrong password, an alert is sent to these addresses.'}
+          </Text>
+        </div>
+        <Space wrap>
+          {!isEditing && (
+            <Button onClick={fetchEmails} loading={loading}>Reload</Button>
+          )}
+          {!isEditing && (
+            <Button type="primary" onClick={handleEdit}>Modify Configuration</Button>
+          )}
+        </Space>
+      </div>
+
+      {loading && !isEditing ? (
+        <Skeleton active paragraph={{ rows: 2 }} />
+      ) : !isEditing ? (
+        <Row gutter={[24, 24]}>
+          <Col span={24}>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>ALERT EMAILS</Text>
+            {emails.length && emails[0] !== '' ? (
+              <Space wrap>
+                {emails.filter(e => e.trim()).map((email, idx) => (
+                  <Tag key={`email-${idx}`} style={{ padding: '4px 12px', fontSize: 13 }}>{email}</Tag>
+                ))}
+              </Space>
+            ) : (
+              <Text strong>—</Text>
+            )}
+          </Col>
+        </Row>
       ) : (
-        <Space direction="vertical" size="small" style={{ width: '100%', maxWidth: 520 }}>
+        <Space direction="vertical" size="middle" style={{ width: '100%', maxWidth: 520 }}>
           {emails.map((email, index) => (
-            <Space key={`cha-alert-email-${index}`} align="baseline" style={{ width: '100%' }}>
+            <Space key={`cha-alert-email-${index}`} align="baseline" style={{ display: 'flex', width: '100%' }}>
               <Input
                 value={email}
                 onChange={(e) => setEmailAt(index, e.target.value)}
                 placeholder="alert@company.com"
-                style={{ minWidth: 280 }}
+                style={{ width: 320 }}
               />
               <Button
                 type="text"
@@ -766,20 +755,17 @@ function ChaPasswordAlertTab({ backendUrl }) {
               />
             </Space>
           ))}
-          <Button type="dashed" block icon={<PlusOutlined />} onClick={addEmailRow}>
-            Add email
+          <Button type="dashed" icon={<PlusOutlined />} onClick={addEmailRow} style={{ width: 320 }}>
+            Add Email
           </Button>
-          <Space wrap>
-            <Button type="primary" onClick={handleSave} loading={saving}>
-              Save alert emails
-            </Button>
-            <Button onClick={fetchEmails} loading={loading}>
-              Reload
-            </Button>
+          <Space wrap style={{ marginTop: 16 }}>
+            <Button onClick={handleCancel}>Cancel</Button>
+            <Button type="primary" onClick={handleSave} loading={saving}>Save alert emails</Button>
+            <Button onClick={fetchEmails} loading={loading} disabled={saving}>Reload</Button>
           </Space>
         </Space>
       )}
-    </Space>
+    </div>
   )
 }
 
@@ -789,32 +775,30 @@ export default function CompanyAdminConfigureChaPage() {
   const tabItems = [
     {
       key: 'credentials',
-      label: 'ICEGATE credentials',
+      label: 'ICEGATE Credentials',
       children: <ChaCredentialsTab backendUrl={BACKEND_URL} />,
     },
     {
       key: 'otp',
-      label: 'OTP',
+      label: 'OTP Configuration',
       children: <ChaOtpTab backendUrl={BACKEND_URL} />,
     },
     {
       key: 'password-alerts',
-      label: 'Password alerts',
+      label: 'Password Alerts',
       children: <ChaPasswordAlertTab backendUrl={BACKEND_URL} />,
     },
   ]
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <div>
-              <Title level={3} style={{ margin: 0 }}>
-                CHA setup
-              </Title>
-              <Text type="secondary">ICEGATE logins and OTP provider settings for CHA process automation.</Text>
-            </div>
-            <Tabs items={tabItems} />
-          </Space>
-        </AppShell>
+      <PageHeader 
+        title="CHA Setup" 
+        description="Configure ICEGATE logins and OTP provider settings for Custom House Agent process automation."
+      />
+      <div style={{ padding: '0 24px 24px 24px' }}>
+        <Tabs items={tabItems} size="large" />
+      </div>
+    </AppShell>
   )
 }
