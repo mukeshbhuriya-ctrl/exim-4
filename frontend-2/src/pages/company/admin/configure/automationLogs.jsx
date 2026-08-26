@@ -1,12 +1,20 @@
-import { ReloadOutlined } from '@ant-design/icons'
-import { Button, Card, Layout, Select, Space, Table, Tag, Typography, message } from 'antd'
+import { ReloadOutlined, RightOutlined, DownOutlined } from '@ant-design/icons'
+import { Button, Layout, Select, Space, Tag, Typography, message, Row, Col, Card } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
+import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
 
-const { Content } = Layout
 const { Title, Text } = Typography
+
+const sectionCardStyle = {
+  background: '#ffffff',
+  borderRadius: 8,
+  padding: 24,
+  boxShadow: '0 1px 2px rgba(0,0,0,0.03), 0 1px 6px -1px rgba(0,0,0,0.02)',
+  borderTop: '4px solid #1677ff',
+}
 
 const AUTOMATION_LOGS_URL = '/api/company/admin/configure/automation/get-automation-logs'
 const SAP_MISSING_DATES_LOGS_URL = '/api/company/admin/configure/automation/sap-missing-dates-logs'
@@ -48,7 +56,7 @@ function statusTagColor(status) {
   if (s === 'successful') return 'success'
   if (s === 'failed') return 'error'
   if (s === 'skip') return 'default'
-  if (s === 'not_run') return 'warning'
+  if (s === 'not_run') return 'default'
   return 'default'
 }
 
@@ -99,32 +107,9 @@ export default function CompanyAdminConfigureAutomationLogsPage() {
   const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '')
 
   const [days, setDays] = useState(30)
-  const [logs, setLogs] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [sapMissing, setSapMissing] = useState(null)
   const [sapMissingLoading, setSapMissingLoading] = useState(false)
-
-  const loadLogs = useCallback(async () => {
-    if (!BACKEND_URL) return
-    setLoading(true)
-    try {
-      const params = new URLSearchParams({ days: String(days) })
-      const res = await fetch(`${BACKEND_URL}${AUTOMATION_LOGS_URL}?${params}`, {
-        method: 'GET',
-        credentials: 'include',
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(data?.detail || data?.message || `Failed to load automation logs (${res.status})`)
-      }
-      setLogs(normalizeLogs(data))
-    } catch (err) {
-      message.error(err instanceof Error ? err.message : 'Failed to load automation logs')
-      setLogs([])
-    } finally {
-      setLoading(false)
-    }
-  }, [BACKEND_URL, days])
 
   const loadSapMissingDates = useCallback(async () => {
     if (!BACKEND_URL) return
@@ -151,9 +136,43 @@ export default function CompanyAdminConfigureAutomationLogsPage() {
     }
   }, [BACKEND_URL, days])
 
-  useEffect(() => {
-    loadLogs()
-  }, [loadLogs])
+  const fetchData = useCallback(async ({ page, limit, search }) => {
+    if (!BACKEND_URL) return { data: [], meta: { total: 0 } }
+    try {
+      const params = new URLSearchParams({ days: String(days) })
+      const res = await fetch(`${BACKEND_URL}${AUTOMATION_LOGS_URL}?${params}`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.detail || data?.message || 'Failed to load logs')
+      }
+      
+      const allLogs = normalizeLogs(data)
+      let filteredLogs = allLogs
+      
+      if (search) {
+        const lowerSearch = search.toLowerCase()
+        filteredLogs = allLogs.filter(log => String(log.date).toLowerCase().includes(lowerSearch))
+      }
+      
+      const start = (page - 1) * limit
+      const paginatedLogs = filteredLogs.slice(start, start + limit)
+      
+      return {
+        data: paginatedLogs,
+        meta: {
+          total: filteredLogs.length,
+          page,
+          last_page: Math.ceil(filteredLogs.length / limit)
+        }
+      }
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : 'Failed to load automation logs')
+      return { data: [], meta: { total: 0 } }
+    }
+  }, [BACKEND_URL, days])
 
   useEffect(() => {
     loadSapMissingDates()
@@ -163,7 +182,7 @@ export default function CompanyAdminConfigureAutomationLogsPage() {
     const processColumns = PROCESS_ORDER.map((key) => ({
       title: PROCESS_LABELS[key] || key,
       key,
-      width: 96,
+      width: 100,
       align: 'center',
       render: (_, row) => <StatusCell entry={row.processes?.[key]} />,
     }))
@@ -184,7 +203,7 @@ export default function CompanyAdminConfigureAutomationLogsPage() {
   const expandedRowRender = (row) => {
     const processes = row?.processes && typeof row.processes === 'object' ? row.processes : {}
     return (
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+      <Space direction="vertical" size="middle" style={{ width: '100%', padding: '12px 24px' }}>
         {PROCESS_ORDER.map((key) => {
           const entry = processes[key]
           if (!entry) return null
@@ -195,29 +214,37 @@ export default function CompanyAdminConfigureAutomationLogsPage() {
               style={{
                 border: '1px solid #f0f0f0',
                 borderRadius: 8,
-                padding: '10px 12px',
-                background: '#fafafa',
+                padding: '12px 16px',
+                background: '#ffffff',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
               }}
             >
-              <Space wrap size={[8, 4]} style={{ marginBottom: 6 }}>
-                <Text strong>{PROCESS_LABELS[key] || key}</Text>
-                <StatusCell entry={entry} />
-                <Text type="secondary">Ran at: {formatRanAt(entry.ranAt)}</Text>
-              </Space>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: entry.error || summary ? 12 : 0, flexWrap: 'wrap', gap: 12 }}>
+                <Space size={12}>
+                  <Text strong style={{ fontSize: 14 }}>{PROCESS_LABELS[key] || key}</Text>
+                  <StatusCell entry={entry} />
+                </Space>
+                <Text type="secondary" style={{ fontSize: 13 }}>Ran at: {formatRanAt(entry.ranAt)}</Text>
+              </div>
               {entry.error ? (
-                <Text type="danger" style={{ display: 'block', whiteSpace: 'pre-wrap' }}>
+                <Text type="danger" style={{ display: 'block', whiteSpace: 'pre-wrap', marginTop: 8 }}>
                   {String(entry.error)}
                 </Text>
               ) : null}
               {summary ? (
                 <pre
                   style={{
-                    margin: entry.error ? '8px 0 0' : 0,
+                    margin: 0,
+                    padding: '12px',
+                    background: '#f9f9f9',
+                    border: '1px solid #f0f0f0',
+                    borderRadius: 6,
                     fontSize: 12,
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word',
-                    maxHeight: 200,
+                    maxHeight: 250,
                     overflow: 'auto',
+                    color: 'var(--exim-gray-700)'
                   }}
                 >
                   {summary}
@@ -227,7 +254,7 @@ export default function CompanyAdminConfigureAutomationLogsPage() {
           )
         })}
         {row.updatedAt ? (
-          <Text type="secondary" style={{ fontSize: 12 }}>
+          <Text type="secondary" style={{ fontSize: 12, display: 'block', textAlign: 'right' }}>
             Log updated: {formatRanAt(row.updatedAt)}
           </Text>
         ) : null}
@@ -235,101 +262,115 @@ export default function CompanyAdminConfigureAutomationLogsPage() {
     )
   }
 
+  const handleRefresh = () => {
+    setRefreshKey(prev => prev + 1)
+    loadSapMissingDates()
+  }
+
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                gap: 12,
-                flexWrap: 'wrap',
+      <PageHeader 
+        title="Automation Logs" 
+        description="Daily execution status and detailed summaries for all automated background processes."
+        actions={
+          <Space>
+            <Select
+              value={days}
+              onChange={(val) => {
+                setDays(val)
+                setRefreshKey(prev => prev + 1)
               }}
-            >
-              <div>
-                <Title level={3} style={{ margin: 0 }}>
-                  Automation logs
-                </Title>
-                <Text type="secondary">
-                  Daily status for automated jobs: sales, PDF, process match, CHA, merge CHA, SB online, and DGFT.
-                </Text>
-              </div>
-              <Space wrap>
-                <Select
-                  value={days}
-                  onChange={setDays}
-                  options={DAYS_OPTIONS}
-                  style={{ width: 160 }}
-                  disabled={loading}
-                />
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={() => {
-                    loadLogs()
-                    loadSapMissingDates()
-                  }}
-                  loading={loading || sapMissingLoading}
-                  disabled={!BACKEND_URL}
-                >
-                  Refresh
-                </Button>
-              </Space>
-            </div>
-
-            <Card
-              size="small"
-              title="SAP missing dates"
+              options={DAYS_OPTIONS}
+              style={{ width: 140 }}
+            />
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={handleRefresh}
               loading={sapMissingLoading}
             >
-              {sapMissing ? (
-                <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                  <Space wrap size={[12, 4]}>
-                    <Text type="secondary">
-                      Range: {sapMissing.from || '—'} → {sapMissing.to || '—'}
-                    </Text>
-                    <Text type="secondary">
-                      Missing: <Text strong>{sapMissing.missing_dates?.length ?? 0}</Text>
-                    </Text>
-                    <Text type="secondary">
-                      Received: {sapMissing.received_dates?.length ?? 0} / {sapMissing.total_days ?? 0}
-                    </Text>
-                    {sapMissing.data_start_from ? (
-                      <Text type="secondary">From: {sapMissing.data_start_from}</Text>
-                    ) : null}
-                  </Space>
-                  {Array.isArray(sapMissing.missing_dates) && sapMissing.missing_dates.length ? (
-                    <Space wrap size={[4, 4]}>
-                      {sapMissing.missing_dates.map((date) => (
-                        <Tag key={date} color="warning">
-                          {date}
-                        </Tag>
-                      ))}
-                    </Space>
-                  ) : (
-                    <Text type="secondary">No missing SAP dates in this range.</Text>
-                  )}
+              Refresh
+            </Button>
+          </Space>
+        }
+      />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24, width: '100%' }}>
+        
+        {/* SAP Missing Dates Section */}
+        <Card
+          size="small"
+          title="SAP missing dates"
+          loading={sapMissingLoading}
+          style={{ width: '100%', borderRadius: 8, borderColor: '#f0f0f0' }}
+        >
+          {sapMissing ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+              <Space wrap size={[12, 4]}>
+                <Text type="secondary">
+                  Range: {sapMissing.from || '—'} → {sapMissing.to || '—'}
+                </Text>
+                <Text type="secondary">
+                  Missing: <Text strong>{sapMissing.missing_dates?.length ?? 0}</Text>
+                </Text>
+                <Text type="secondary">
+                  Received: {sapMissing.received_dates?.length ?? 0} / {sapMissing.total_days ?? 0}
+                </Text>
+                {sapMissing.data_start_from ? (
+                  <Text type="secondary">From: {sapMissing.data_start_from}</Text>
+                ) : null}
+              </Space>
+              {Array.isArray(sapMissing.missing_dates) && sapMissing.missing_dates.length ? (
+                <Space wrap size={[4, 4]}>
+                  {sapMissing.missing_dates.map((date) => (
+                    <Tag key={date} color="error">
+                      {date}
+                    </Tag>
+                  ))}
                 </Space>
               ) : (
-                <Text type="secondary">No SAP missing-date summary yet.</Text>
+                <Text type="secondary">No missing SAP dates in this range.</Text>
               )}
-            </Card>
+            </div>
+          ) : (
+            <Text type="secondary">No SAP missing-date summary yet.</Text>
+          )}
+        </Card>
 
-            <Table
-              rowKey={(row) => String(row.date)}
-              columns={columns}
-              dataSource={logs}
-              loading={loading}
-              pagination={{ pageSize: 15, showSizeChanger: true, pageSizeOptions: ['15', '30', '60'] }}
-              scroll={{ x: 'max-content' }}
-              size="small"
-              expandable={{
-                expandedRowRender,
-                rowExpandable: (row) =>
-                  Boolean(row?.processes && typeof row.processes === 'object'),
-              }}
-            />
-          </Space>
-        </AppShell>
+        {/* ProDataTable Section */}
+        <div style={{ ...sectionCardStyle, display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '24px 24px 0 24px' }}>
+            <Title level={5} style={{ margin: 0, color: 'var(--exim-gray-800)' }}>
+              Execution Logs
+            </Title>
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              Expand any row to view full JSON output and detailed error summaries.
+            </Text>
+          </div>
+          <ProDataTable
+            columns={columns}
+            fetchData={fetchData}
+            refreshKey={refreshKey}
+            rowKey={(row) => String(row.date)}
+            showSelectionColumn={false}
+            globalSearchPlaceholder="Search by Date..."
+            expandable={{
+              expandedRowRender,
+              rowExpandable: (row) => Boolean(row?.processes && typeof row.processes === 'object'),
+              expandIcon: ({ expanded, onExpand, record }) =>
+                expanded ? (
+                  <DownOutlined
+                    onClick={(e) => onExpand(record, e)}
+                    style={{ fontSize: 13, cursor: 'pointer', padding: 4, color: 'var(--exim-gray-600)' }}
+                  />
+                ) : (
+                  <RightOutlined
+                    onClick={(e) => onExpand(record, e)}
+                    style={{ fontSize: 13, cursor: 'pointer', padding: 4, color: 'var(--exim-gray-500)' }}
+                  />
+                )
+            }}
+          />
+        </div>
+      </div>
+    </AppShell>
   )
 }

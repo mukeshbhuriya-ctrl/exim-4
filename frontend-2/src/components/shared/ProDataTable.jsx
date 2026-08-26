@@ -309,6 +309,7 @@ const ProDataTable = ({
   lockActiveFilters = false,
   customToolbarActions,
   rowKey = 'id',
+  expandable,
 }) => {
   const [data, setData] = useState([])
   const [meta, setMeta] = useState({})
@@ -531,6 +532,7 @@ const ProDataTable = ({
             return isSelected ? 'pro-table-row-selected' : 'pro-table-row'
           }}
           locale={{ emptyText: <div style={{ height: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--exim-gray-400)', fontWeight: 500 }}>No records found.</div> }}
+          expandable={expandable}
         />
 
         {/* Pagination */}
