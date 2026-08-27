@@ -1,4 +1,4 @@
-import { CloudUploadOutlined, CloseOutlined, DownloadOutlined, ReloadOutlined, CloudDownloadOutlined } from '@ant-design/icons'
+import { CloudUploadOutlined, CloseOutlined, DownloadOutlined, ReloadOutlined, CloudDownloadOutlined, FilePdfOutlined } from '@ant-design/icons'
 import { Button, Layout, Space, Table, Typography, Upload, message, Card, InputNumber, Alert, Tooltip, Tag } from 'antd'
 import { Link } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -350,7 +350,22 @@ export default function CompanyAdminUploadPdfPage() {
   return (
     <AppShell sidebar={<CompanySidebar />}>
       <PageHeader 
-        title="LEO Copy PDF" 
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 44, height: 44, 
+              borderRadius: 12, 
+              background: 'linear-gradient(135deg, var(--exim-primary) 0%, #60a5fa 100%)', 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', 
+              color: '#fff', 
+              boxShadow: '0 4px 14px rgba(59, 130, 246, 0.25)',
+              border: '1px solid rgba(255,255,255,0.2)'
+            }}>
+              <FilePdfOutlined style={{ fontSize: 22 }} />
+            </div>
+            <span style={{ letterSpacing: '-0.5px' }}>LEO Copy PDF</span>
+          </div>
+        } 
         description="Manage, fetch, and process PDF documents for automated data extraction."
         actions={
           currentView === 'upload' ? (
@@ -396,7 +411,15 @@ export default function CompanyAdminUploadPdfPage() {
                 type="primary"
                 icon={<CloudUploadOutlined />}
                 onClick={() => setCurrentView('upload')}
-                style={{ fontWeight: 500 }}
+                style={{ 
+                  fontWeight: 600, 
+                  height: 38, 
+                  padding: '0 20px', 
+                  borderRadius: 8,
+                  boxShadow: '0 2px 8px rgba(30, 58, 138, 0.15)',
+                  background: 'linear-gradient(180deg, var(--exim-primary) 0%, #1d4ed8 100%)',
+                  border: 'none'
+                }}
               >
                 Upload Manual
               </Button>
