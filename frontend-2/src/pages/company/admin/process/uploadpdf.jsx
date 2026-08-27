@@ -1,8 +1,10 @@
-import { CloudUploadOutlined, CloseOutlined, DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, Layout, Space, Table, Typography, Upload, message, Card } from 'antd'
+import { CloudUploadOutlined, CloseOutlined, DownloadOutlined, ReloadOutlined, CloudDownloadOutlined } from '@ant-design/icons'
+import { Button, Layout, Space, Table, Typography, Upload, message, Card, InputNumber, Alert, Tooltip, Tag } from 'antd'
+import { Link } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
+import PageHeader from '../../../../components/common/PageHeader.jsx'
 import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
 
 const { Content } = Layout
@@ -27,6 +29,13 @@ function fileNameFromContentDisposition(header) {
 
 const PDF_DATA_DEFAULT_LIMIT = 50
 const PDF_DATA_MAX_LIMIT = 500
+
+function clampMailboxMaxMessages(value) {
+  if (value == null || value === '') return undefined
+  const n = Number(value)
+  if (!Number.isFinite(n) || n < 1) return undefined
+  return Math.floor(n)
+}
 
 function clampPdfDataPage(page) {
   const n = Number(page)
@@ -91,6 +100,93 @@ export default function CompanyAdminUploadPdfPage() {
   const [pdfDataLoading, setPdfDataLoading] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
   const [dynamicColumns, setDynamicColumns] = useState([])
+
+  const [mailboxStatus, setMailboxStatus] = useState(null)
+  const [mailboxStatusLoading, setMailboxStatusLoading] = useState(false)
+  const [mailboxMaxMessages, setMailboxMaxMessages] = useState(null)
+  const [mailboxFetching, setMailboxFetching] = useState(false)
+  const [lastMailboxResult, setLastMailboxResult] = useState(null)
+
+  const checkMailboxStatus = useCallback(async () => {
+    if (!BACKEND_URL) return
+    setMailboxStatusLoading(true)
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/company/admin/configure/pdf/mailbox-status`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setMailboxStatus(null)
+        return
+      }
+      setMailboxStatus({
+        provider: String(data.provider || '').trim().toLowerCase(),
+        gmailReady: Boolean(data.gmail?.ready),
+        outlookReady: Boolean(data.outlook?.ready),
+      })
+    } catch {
+      setMailboxStatus(null)
+    } finally {
+      setMailboxStatusLoading(false)
+    }
+  }, [BACKEND_URL])
+
+  useEffect(() => {
+    checkMailboxStatus()
+  }, [checkMailboxStatus])
+
+  const mailboxReady = Boolean(
+    mailboxStatus?.provider &&
+      ((mailboxStatus.provider === 'gmail' && mailboxStatus.gmailReady) ||
+        (mailboxStatus.provider === 'outlook' && mailboxStatus.outlookReady)),
+  )
+
+  const handleFetchFromMailbox = async () => {
+    if (!BACKEND_URL) {
+      message.error('Backend URL is not configured (VITE_BACKEND_URL).')
+      return
+    }
+    if (!mailboxReady) {
+      message.warning('Configure and activate Gmail or Outlook under Configure → PDF setup first.')
+      return
+    }
+
+    const maxMessages = clampMailboxMaxMessages(mailboxMaxMessages)
+
+    setMailboxFetching(true)
+    setLastMailboxResult(null)
+    try {
+      const params = new URLSearchParams()
+      if (maxMessages != null) {
+        params.set('maxMessages', String(maxMessages))
+      }
+      const query = params.toString()
+      const url = `${BACKEND_URL}/api/company/admin/process/pdf/get-pdf-data-from-mailbox${query ? `?${query}` : ''}`
+      const res = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.detail || data?.message || `Mailbox fetch failed (${res.status})`)
+      }
+
+      setLastMailboxResult(data)
+
+      if (data?.success === false) {
+        message.warning(data?.message || 'Mailbox fetch completed with issues.')
+      } else {
+        message.success(data?.message || 'PDF data fetched from mailbox successfully.')
+      }
+
+      setRefreshKey(prev => prev + 1)
+    } catch (err) {
+      message.error(err instanceof Error ? err.message : 'Failed to fetch PDF data from mailbox')
+    } finally {
+      setMailboxFetching(false)
+    }
+  }
 
   const fetchData = useCallback(
     async ({ page, limit }) => {
@@ -253,24 +349,63 @@ export default function CompanyAdminUploadPdfPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16 }}>
-        {/* Page Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <Title level={4} style={{ margin: 0, color: 'var(--exim-gray-900)' }}>
-              LEO Copy PDF
-            </Title>
-            <Text type="secondary" style={{ fontSize: 13 }}>
-              Manage and process uploaded PDF documents.
-            </Text>
-          </div>
-          {currentView === 'upload' && (
+      <PageHeader 
+        title="LEO Copy PDF" 
+        description="Manage, fetch, and process PDF documents for automated data extraction."
+        actions={
+          currentView === 'upload' ? (
             <Button onClick={() => setCurrentView('list')} style={{ fontWeight: 500 }}>
               Cancel & Back to List
             </Button>
-          )}
-        </div>
+          ) : (
+            <Space size={16} split={<div style={{ width: 1, height: 24, background: 'var(--exim-border-light)' }} />}>
+              <Space size={8} align="center">
+                {/* <Text type="secondary" style={{ fontSize: 13 }}>Mails to process:</Text> */}
+                <Space.Compact>
+                  <Tooltip title={!mailboxReady ? "Configure Gmail/Outlook in PDF Setup first" : "Max emails to fetch (Leave blank for all)"}>
+                    <InputNumber
+                      min={1}
+                      max={500}
+                      placeholder="All"
+                      value={mailboxMaxMessages}
+                      onChange={(value) => setMailboxMaxMessages(value ?? null)}
+                      disabled={mailboxFetching || mailboxStatusLoading || !mailboxReady}
+                      style={{ width: 64 }}
+                    />
+                  </Tooltip>
+                  <Button
+                    onClick={() => setMailboxMaxMessages(1)}
+                    disabled={mailboxFetching || mailboxStatusLoading || !mailboxReady}
+                  >
+                    1 only
+                  </Button>
+                  <Tooltip title={!mailboxReady ? "Activate Gmail/Outlook in PDF Setup to enable automated fetching" : "Fetch new PDFs from mailbox"}>
+                    <Button
+                      type="default"
+                      icon={<CloudDownloadOutlined />}
+                      loading={mailboxFetching}
+                      onClick={handleFetchFromMailbox}
+                      disabled={!BACKEND_URL || mailboxFetching || !mailboxReady || mailboxStatusLoading}
+                    >
+                      Fetch Mailbox
+                    </Button>
+                  </Tooltip>
+                </Space.Compact>
+              </Space>
+              <Button
+                type="primary"
+                icon={<CloudUploadOutlined />}
+                onClick={() => setCurrentView('upload')}
+                style={{ fontWeight: 500 }}
+              >
+                Upload Manual
+              </Button>
+            </Space>
+          )
+        }
+      />
 
+      <div style={{ padding: 0, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         {currentView === 'upload' ? (
           /* Inline Flat Uploader View */
           <div style={{ background: '#fff', border: '1px solid var(--exim-border-light)', padding: 32, borderRadius: 8, flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -360,33 +495,79 @@ export default function CompanyAdminUploadPdfPage() {
           </div>
         ) : (
           /* Data Table View */
-          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-            <ProDataTable
-              columns={dynamicColumns}
-              fetchData={fetchData}
-              refreshKey={refreshKey}
-              onExport={handleDownloadPdfDataExcel}
-              rowKey={(_, index) => `pdf-data-${index}`}
-              globalSearchPlaceholder="Search PDF Data..."
-              customToolbarActions={
-                <Space>
-                  <Button
-                    type="primary"
-                    icon={<CloudUploadOutlined />}
-                    onClick={() => setCurrentView('upload')}
-                    style={{ fontWeight: 500 }}
-                  >
-                    Upload New PDFs
-                  </Button>
-                  <Button
-                    icon={<ReloadOutlined />}
-                    onClick={() => setRefreshKey(prev => prev + 1)}
-                  >
-                    Refresh
-                  </Button>
-                </Space>
-              }
-            />
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {lastMailboxResult?.data && (
+              <Card size="small" style={{ background: lastMailboxResult.success === false ? '#fffbe6' : '#f6ffed', borderColor: lastMailboxResult.success === false ? '#ffe58f' : '#b7eb8f', borderRadius: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16 }}>
+                  <div>
+                    <Text strong style={{ display: 'block', fontSize: 14, marginBottom: 4, color: 'var(--exim-gray-800)' }}>
+                      Mailbox Fetch Summary {lastMailboxResult.provider && <Tag color="blue" style={{ marginLeft: 8 }}>{String(lastMailboxResult.provider).toUpperCase()}</Tag>}
+                    </Text>
+                    {lastMailboxResult.message && (
+                      <Text type="secondary" style={{ display: 'block', fontSize: 13, marginBottom: 12 }}>
+                        {String(lastMailboxResult.message)}
+                      </Text>
+                    )}
+                    <Space size="large" wrap>
+                      <Space direction="vertical" size={0}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Source Folder</Text>
+                        <Text strong>{String(lastMailboxResult.data.fromMailboxName || lastMailboxResult.data.fromLabelName || '—')}</Text>
+                      </Space>
+                      <Space direction="vertical" size={0}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Found</Text>
+                        <Text strong>{String(lastMailboxResult.data.total_mails ?? 0)}</Text>
+                      </Space>
+                      <Space direction="vertical" size={0}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Processed</Text>
+                        <Text strong style={{ color: 'var(--exim-success)' }}>{String(lastMailboxResult.data.processed_mails ?? 0)}</Text>
+                      </Space>
+                      <Space direction="vertical" size={0}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Skipped</Text>
+                        <Text strong style={{ color: 'var(--exim-gray-500)' }}>{String(lastMailboxResult.data.skipped_mails ?? 0)}</Text>
+                      </Space>
+                      <Space direction="vertical" size={0}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Failed</Text>
+                        <Text strong style={{ color: 'var(--exim-danger)' }}>{String(lastMailboxResult.data.failed_mails ?? 0)}</Text>
+                      </Space>
+                      <Space direction="vertical" size={0}>
+                        <Text type="secondary" style={{ fontSize: 12 }}>Data Rows Stored</Text>
+                        <Text strong style={{ color: 'var(--exim-primary)' }}>{String(lastMailboxResult.data.stored_rows ?? 0)}</Text>
+                      </Space>
+                    </Space>
+                  </div>
+                  <Button size="small" type="text" icon={<CloseOutlined />} onClick={() => setLastMailboxResult(null)} />
+                </div>
+              </Card>
+            )}
+
+            <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+              <ProDataTable
+                columns={dynamicColumns}
+                fetchData={fetchData}
+                refreshKey={refreshKey}
+                rowKey={(_, index) => `pdf-data-${index}`}
+                globalSearchPlaceholder="Search PDF Data..."
+                customToolbarActions={
+                  <Space>
+                    <Button
+                      type="default"
+                      icon={<DownloadOutlined />}
+                      loading={downloadingExcel}
+                      onClick={handleDownloadPdfDataExcel}
+                      disabled={!BACKEND_URL || downloadingExcel}
+                    >
+                      Download PDF data (Excel)
+                    </Button>
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={() => setRefreshKey(prev => prev + 1)}
+                    >
+                      Refresh
+                    </Button>
+                  </Space>
+                }
+              />
+            </div>
           </div>
         )}
       </div>

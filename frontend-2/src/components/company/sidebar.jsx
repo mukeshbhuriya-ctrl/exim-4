@@ -101,8 +101,8 @@ const menuItems = [
     label: 'Process',
     children: [
       { key: '/admin/upload-pdf', label: 'LEO Copy' },
-      { key: '/admin/fetch-pdf-data', label: 'Fetch PDF Data' },
-      { key: '/admin/upload-sales', label: 'Upload Sales' },
+      // { key: '/admin/fetch-pdf-data', label: 'Fetch PDF Data' },
+      { key: '/admin/upload-sales', label: 'Sales' },
       // { key: '/admin/fetch-from-sap-sales', label: 'Fetch from SAP' },
       { key: '/admin/start-process', label: 'Start Process' },
       { key: '/admin/manual-process-match', label: 'Manual Match' },
