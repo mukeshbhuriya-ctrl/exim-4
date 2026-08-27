@@ -1,9 +1,10 @@
-import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, Layout, Space, Table, Typography, Upload, message } from 'antd'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { CloudUploadOutlined, CloseOutlined, DownloadOutlined, ReloadOutlined, FileExcelOutlined } from '@ant-design/icons'
+import { Button, Layout, Space, Typography, Upload, message } from 'antd'
+import { useCallback, useState } from 'react'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
+import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -93,21 +94,20 @@ function getTableColumnsFromRows(rows) {
 
 export default function CompanyAdminUploadSalesPage() {
   const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '')
+  const [currentView, setCurrentView] = useState('list')
   const [files, setFiles] = useState([])
   const [uploading, setUploading] = useState(false)
   const [downloadingExcel, setDownloadingExcel] = useState(false)
-  const [salesDataRows, setSalesDataRows] = useState([])
-  const [salesDataLoading, setSalesDataLoading] = useState(false)
-  const [salesDataPage, setSalesDataPage] = useState(1)
-  const [salesDataLimit, setSalesDataLimit] = useState(SALES_DATA_DEFAULT_LIMIT)
-  const [salesDataTotal, setSalesDataTotal] = useState(0)
+  
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [dynamicColumns, setDynamicColumns] = useState([])
 
-  const fetchSalesData = useCallback(
-    async (page, limit) => {
-      if (!BACKEND_URL) return
+  const fetchData = useCallback(
+    async ({ page, limit }) => {
+      if (!BACKEND_URL) return { data: [], meta: { total: 0 } }
       const p = clampSalesDataPage(page)
       const l = clampSalesDataLimit(limit)
-      setSalesDataLoading(true)
+      
       try {
         const params = new URLSearchParams({
           page: String(p),
@@ -121,42 +121,34 @@ export default function CompanyAdminUploadSalesPage() {
         if (!res.ok) {
           throw new Error(data?.detail || data?.message || `Failed to load sales data (${res.status})`)
         }
+        
         const rows = normalizeSalesDataRows(data).filter((r) => r && typeof r === 'object')
-        setSalesDataRows(rows)
+        
+        setDynamicColumns(prev => {
+          if (prev.length === 0 && rows.length > 0) {
+            return getTableColumnsFromRows(rows)
+          }
+          return prev
+        })
 
         let total = 0
         if (data.pagination && typeof data.pagination === 'object') {
-          const pg = data.pagination
-          setSalesDataPage(clampSalesDataPage(pg.page ?? p))
-          setSalesDataLimit(clampSalesDataLimit(pg.limit ?? l))
-          total = Number(pg.total)
+          total = Number(data.pagination.total)
         } else {
-          setSalesDataPage(p)
-          setSalesDataLimit(l)
-          const t = data.total ?? data.totalCount
-          total = Number(t)
+          total = Number(data.total ?? data.totalCount)
         }
         if (!Number.isFinite(total)) {
           total = rows.length
         }
-        setSalesDataTotal(total)
+        
+        return { data: rows, meta: { total } }
       } catch (err) {
         message.error(err instanceof Error ? err.message : 'Failed to load sales data')
-        setSalesDataRows([])
-        setSalesDataTotal(0)
-      } finally {
-        setSalesDataLoading(false)
+        return { data: [], meta: { total: 0 } }
       }
     },
-    [BACKEND_URL],
+    [BACKEND_URL]
   )
-
-  useEffect(() => {
-    if (!BACKEND_URL) return
-    fetchSalesData(1, SALES_DATA_DEFAULT_LIMIT)
-  }, [BACKEND_URL, fetchSalesData])
-
-  const salesDataColumns = useMemo(() => getTableColumnsFromRows(salesDataRows), [salesDataRows])
 
   const handleBeforeUpload = (file) => {
     if (!isExcelFile(file)) {
@@ -210,7 +202,8 @@ export default function CompanyAdminUploadSalesPage() {
 
       message.success(data?.message || 'Sales files uploaded successfully')
       setFiles([])
-      fetchSalesData(1, salesDataLimit)
+      setCurrentView('list')
+      setRefreshKey(prev => prev + 1)
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Failed to upload sales files')
     } finally {
@@ -259,13 +252,62 @@ export default function CompanyAdminUploadSalesPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="middle" style={{ width: '100%', minWidth: 0 }}>
-            <div>
-              <Title level={3} style={{ margin: 0 }}>
-                Upload sales (Excel)
-              </Title>
-              <Text type="secondary">Select multiple Excel files (.xlsx, .xls) and upload them for processing.</Text>
+      <PageHeader 
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 44, height: 44, 
+              borderRadius: 12, 
+              background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)', 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', 
+              color: '#fff', 
+              boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+              border: '1px solid rgba(255,255,255,0.2)'
+            }}>
+              <FileExcelOutlined style={{ fontSize: 22 }} />
             </div>
+            <span style={{ letterSpacing: '-0.5px' }}>Sales (Excel)</span>
+          </div>
+        } 
+        description="Select multiple Excel files and upload them for automated processing."
+        actions={
+          currentView === 'upload' ? (
+            <Button onClick={() => setCurrentView('list')} style={{ fontWeight: 500 }}>
+              Cancel & Back to List
+            </Button>
+          ) : (
+            <Space size={16}>
+              <Button
+                type="primary"
+                icon={<CloudUploadOutlined />}
+                onClick={() => setCurrentView('upload')}
+                style={{ 
+                  fontWeight: 600, 
+                  height: 38, 
+                  padding: '0 20px', 
+                  borderRadius: 8,
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.15)',
+                  background: 'linear-gradient(180deg, #10b981 0%, #059669 100%)',
+                  border: 'none'
+                }}
+              >
+                Upload Manual
+              </Button>
+            </Space>
+          )
+        }
+      />
+
+      <div style={{ padding: 0, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {currentView === 'upload' ? (
+          /* Inline Flat Uploader View */
+          <div style={{ background: '#fff', border: '1px solid var(--exim-border-light)', padding: 32, borderRadius: 8, flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <Title level={4} style={{ marginTop: 0, marginBottom: 8, color: 'var(--exim-gray-800)' }}>
+              Sales Files
+            </Title>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>
+              Drop one or many Excel files (.xlsx, .xls) here to process sales data.
+            </Text>
 
             <Upload.Dragger
               accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
@@ -273,96 +315,100 @@ export default function CompanyAdminUploadSalesPage() {
               beforeUpload={handleBeforeUpload}
               onRemove={handleRemove}
               fileList={files}
-              style={{ padding: 16 }}
+              listType="text"
+              showUploadList={false}
+              style={{ padding: '40px 16px', background: '#f8fafc', borderColor: '#cbd5e1' }}
             >
-              <Title level={5} style={{ margin: 0 }}>
-                Excel files
-              </Title>
-              <Text type="secondary">Drop one or many Excel files here</Text>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+                <CloudUploadOutlined style={{ fontSize: 48, color: 'var(--exim-primary)' }} />
+                <div style={{ textAlign: 'center' }}>
+                  <p className="ant-upload-text" style={{ fontSize: 16, fontWeight: 500, color: 'var(--exim-gray-800)', margin: 0 }}>
+                    Click or drag files to this area to upload
+                  </p>
+                  <p className="ant-upload-hint" style={{ fontSize: 13, color: 'var(--exim-gray-500)', marginTop: 8, marginBottom: 0 }}>
+                    Supports bulk upload of Excel spreadsheets.
+                  </p>
+                </div>
+              </div>
             </Upload.Dragger>
 
-            <div style={{ minWidth: 0, width: '100%' }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  flexWrap: 'wrap',
-                  marginBottom: 12,
-                  position: 'sticky',
-                  top: 0,
-                  zIndex: 10,
-                  background: '#fff',
-                  paddingTop: 8,
-                  paddingBottom: 8,
-                  marginInline: -24,
-                  paddingInline: 24,
-                  borderBottom: '1px solid #f0f0f0',
-                  boxShadow: '0 1px 0 rgba(0,0,0,0.04)',
-                }}
-              >
-                <Title level={5} style={{ margin: 0 }}>
-                  Sales data
-                </Title>
-                <Space wrap>
-                  <Button type="primary" loading={uploading} onClick={handleUpload} disabled={uploading}>
-                    Upload sales files
-                  </Button>
-                  <Button onClick={clearFiles} disabled={uploading || !files.length}>
-                    Clear
-                  </Button>
+            {files.length > 0 && (
+              <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--exim-border-light)', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <Text strong style={{ fontSize: 14, color: 'var(--exim-gray-800)', display: 'block', marginBottom: 12 }}>
+                  Selected Files ({files.length})
+                </Text>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, overflowY: 'auto' }} className="custom-scrollbar">
+                  {files.map(file => (
+                    <div
+                      key={file.uid}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '6px 12px',
+                        background: '#f8fafc',
+                        border: '1px solid #e2e8f0',
+                        fontSize: 13,
+                        borderRadius: 4,
+                      }}
+                    >
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 300 }} title={file.name}>
+                        {file.name}
+                      </span>
+                      <Button
+                        type="text"
+                        size="small"
+                        icon={<CloseOutlined style={{ fontSize: 10 }} />}
+                        onClick={() => handleRemove(file)}
+                        style={{ height: 20, width: 20, minWidth: 20, padding: 0, color: 'var(--exim-gray-400)' }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--exim-border-light)', display: 'flex', justifyContent: 'flex-end', gap: 16 }}>
+              <Button onClick={clearFiles} disabled={uploading || !files.length} size="large">
+                Clear All
+              </Button>
+              <Button type="primary" loading={uploading} onClick={handleUpload} disabled={uploading || !files.length} size="large" icon={<CloudUploadOutlined />}>
+                Process Files
+              </Button>
+            </div>
+          </div>
+        ) : (
+          /* Data Table View */
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <ProDataTable
+              columns={dynamicColumns}
+              fetchData={fetchData}
+              refreshKey={refreshKey}
+              rowKey={(_, index) => `sales-data-${index}`}
+              globalSearchPlaceholder="Search Sales Data..."
+              customToolbarActions={
+                <Space>
                   <Button
+                    type="default"
                     icon={<DownloadOutlined />}
                     loading={downloadingExcel}
                     onClick={handleDownloadSalesDataExcel}
                     disabled={!BACKEND_URL || downloadingExcel}
                   >
-                    Download sales data (Excel)
+                    Download Sales Data (Excel)
                   </Button>
                   <Button
-                    type="default"
                     icon={<ReloadOutlined />}
-                    loading={salesDataLoading}
-                    onClick={() => fetchSalesData(salesDataPage, salesDataLimit)}
-                    disabled={!BACKEND_URL || salesDataLoading}
+                    onClick={() => setRefreshKey(prev => prev + 1)}
                   >
                     Refresh
                   </Button>
                 </Space>
-              </div>
-              <div
-                style={{
-                  minWidth: 0,
-                  width: '100%',
-                  maxWidth: '100%',
-                  overflowX: 'auto',
-                  WebkitOverflowScrolling: 'touch',
-                  boxSizing: 'border-box',
-                }}
-              >
-                <Table
-                  rowKey={(_, index) => `sales-data-${salesDataPage}-${index}`}
-                  columns={salesDataColumns}
-                  dataSource={salesDataRows}
-                  loading={salesDataLoading}
-                  sticky
-                  pagination={{
-                    current: salesDataPage,
-                    pageSize: salesDataLimit,
-                    total: salesDataTotal,
-                    showSizeChanger: true,
-                    pageSizeOptions: ['10', '20', '50', '100', '200', '500'],
-                    showTotal: (total, range) => `${range[0]}-${range[1]} of ${total}`,
-                    onChange: (page, pageSize) => fetchSalesData(page, pageSize),
-                    onShowSizeChange: (_, size) => fetchSalesData(1, size),
-                  }}
-                  scroll={{ x: 'max-content', y: 520 }}
-                  size="small"
-                />
-              </div>
-            </div>
-          </Space>
-        </AppShell>
+              }
+            />
+          </div>
+        )}
+      </div>
+    </AppShell>
   )
 }
