@@ -1,12 +1,12 @@
-import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Alert, Button, Layout, Space, Table, Typography, message } from 'antd'
+import { DownloadOutlined, ReloadOutlined, PlayCircleOutlined, EyeOutlined, FileExcelOutlined, FilePdfOutlined, ExclamationCircleOutlined, CheckCircleOutlined } from '@ant-design/icons'
+import { Alert, Button, Layout, Space, Typography, message, Card, Drawer, Tag, Radio, Tabs } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
+import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
 
-const { Content } = Layout
 const { Title, Text } = Typography
 
 function normalizeBatchList(data) {
@@ -61,7 +61,6 @@ function getTableColumnsFromRows(rows) {
   }))
 }
 
-/** Union of keys across all merged objects so wide rows still get columns. */
 function getMergedColumnsFromDetailRows(rows) {
   const keys = new Set()
   for (const item of rows) {
@@ -78,7 +77,6 @@ function getMergedColumnsFromDetailRows(rows) {
   return getTableColumnsFromRows([synthetic])
 }
 
-/** Min width for Table scroll.x from column count. */
 function tableScrollX(columnCount) {
   return Math.max(900, columnCount * 160)
 }
@@ -103,7 +101,6 @@ function rowsForExcel(rows) {
   })
 }
 
-/** Value is an array of row objects, or an object wrapping `rows` / `items` / `list` / `data`. */
 function asRowArray(value) {
   if (value == null) return []
   if (Array.isArray(value)) return value.filter((x) => x != null)
@@ -151,7 +148,6 @@ function firstDetailRowArray(obj, keys) {
   return []
 }
 
-/** Optional nested `remaining: { sales?, pdf? }` shape. */
 function remainingFromNestedRemaining(detail) {
   const rem = detail?.remaining
   if (!rem || typeof rem !== 'object') return { sales: [], pdf: [] }
@@ -161,10 +157,6 @@ function remainingFromNestedRemaining(detail) {
   }
 }
 
-/**
- * Sales / PDF sheets: prefer true remaining arrays from API; unwrap `{ rows: [] }`;
- * if still empty, export each match's salesRow / pdfRow so sheets are not blank.
- */
 function buildSideSheetsForExport(detail, detailRows) {
   const empty = {
     salesRows: [],
@@ -204,7 +196,6 @@ function buildSideSheetsForExport(detail, detailRows) {
   }
 }
 
-/** Slim upload-row shape: spread `data` and keep ids for export. */
 function flattenMaybeUploadRow(row) {
   if (!row || typeof row !== 'object') return { value: String(row ?? '') }
   if (row.data != null && typeof row.data === 'object' && !Array.isArray(row.data)) {
@@ -294,6 +285,9 @@ function downloadUnmatchedRowsExcel(salesFlatRows, pdfFlatRows) {
 export default function CompanyAdminStartProcessPage() {
   const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '')
 
+  const [activeTab, setActiveTab] = useState('history')
+  const [activeUnmatchedTable, setActiveUnmatchedTable] = useState('sales')
+
   const [batches, setBatches] = useState([])
   const [batchesLoading, setBatchesLoading] = useState(false)
   const [selectedBatchId, setSelectedBatchId] = useState(null)
@@ -305,8 +299,10 @@ export default function CompanyAdminStartProcessPage() {
 
   const [unmatchedData, setUnmatchedData] = useState(null)
   const [unmatchedLoading, setUnmatchedLoading] = useState(false)
-  const [unmatchedSalesVisible, setUnmatchedSalesVisible] = useState(false)
-  const [unmatchedPdfVisible, setUnmatchedPdfVisible] = useState(false)
+
+  const [batchesRefreshKey, setBatchesRefreshKey] = useState(0)
+  const [unmatchedRefreshKey, setUnmatchedRefreshKey] = useState(0)
+  const [detailRefreshKey, setDetailRefreshKey] = useState(0)
 
   const fetchUnmatchedRows = useCallback(
     async ({ showError = true } = {}) => {
@@ -439,6 +435,7 @@ export default function CompanyAdminStartProcessPage() {
     }
   }, [selectedBatchId, fetchBatchDetail])
 
+  // Data processing memos
   const detailRows = useMemo(() => normalizeRowList(detail?.rows), [detail])
 
   const mergedTableRows = useMemo(
@@ -486,14 +483,43 @@ export default function CompanyAdminStartProcessPage() {
     () => getUnionColumnsFromFlatRows(unmatchedPdfRows),
     [unmatchedPdfRows],
   )
-  const unmatchedSalesCount =
-    unmatchedData?.salesUnmatchedCount ?? unmatchedSalesRowsRaw.length
+  const unmatchedSalesCount = unmatchedData?.salesUnmatchedCount ?? unmatchedSalesRowsRaw.length
   const unmatchedPdfCount = unmatchedData?.pdfUnmatchedCount ?? unmatchedPdfRowsRaw.length
 
   const selectedBatch = useMemo(
     () => batches.find((b) => b != null && String(b.id) === selectedBatchId),
     [batches, selectedBatchId],
   )
+
+  // Memory Bridge Updates
+  useEffect(() => { setBatchesRefreshKey(r => r + 1) }, [batches])
+  useEffect(() => { setUnmatchedRefreshKey(r => r + 1) }, [unmatchedSalesRows, unmatchedPdfRows])
+  useEffect(() => { setDetailRefreshKey(r => r + 1) }, [mergedTableRows])
+
+  // ProDataTable Fetchers
+  const fetchBatchesData = useCallback(async ({ page, limit }) => {
+    const start = (page - 1) * limit
+    const paged = batches.slice(start, start + limit)
+    return { data: paged, meta: { total: batches.length } }
+  }, [batches])
+
+  const fetchUnmatchedSalesData = useCallback(async ({ page, limit }) => {
+    const start = (page - 1) * limit
+    const paged = unmatchedSalesRows.slice(start, start + limit)
+    return { data: paged, meta: { total: unmatchedSalesRows.length } }
+  }, [unmatchedSalesRows])
+
+  const fetchUnmatchedPdfData = useCallback(async ({ page, limit }) => {
+    const start = (page - 1) * limit
+    const paged = unmatchedPdfRows.slice(start, start + limit)
+    return { data: paged, meta: { total: unmatchedPdfRows.length } }
+  }, [unmatchedPdfRows])
+
+  const fetchMergedData = useCallback(async ({ page, limit }) => {
+    const start = (page - 1) * limit
+    const paged = mergedTableRows.slice(start, start + limit)
+    return { data: paged, meta: { total: mergedTableRows.length } }
+  }, [mergedTableRows])
 
   const batchColumns = useMemo(
     () => [
@@ -561,16 +587,19 @@ export default function CompanyAdminStartProcessPage() {
         render: (v) => (v == null ? '—' : String(v)),
       },
       {
-        title: '',
+        title: 'Action',
         key: 'action',
-        width: 80,
+        width: 100,
+        align: 'center',
         render: (_, record) => (
           <Button
-            type="link"
+            type="primary"
+            ghost
             size="small"
+            icon={<EyeOutlined />}
             onClick={() => setSelectedBatchId(record?.id != null ? String(record.id) : null)}
           >
-            View
+            View Batch
           </Button>
         ),
       },
@@ -606,351 +635,209 @@ export default function CompanyAdminStartProcessPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="large" style={{ width: '100%', maxWidth: '100%' }}>
-            <div>
-              <Title level={3} style={{ margin: 0 }}>
-                Process batches
-              </Title>
-              <Text type="secondary">
-                Run matching on sales and PDF data already uploaded for your company. Then open a batch below to see
-                merged rows.
-              </Text>
+      <PageHeader
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 36, height: 36, 
+              borderRadius: 10, 
+              background: 'linear-gradient(135deg, var(--exim-primary) 0%, #60a5fa 100%)', 
+              display: 'flex', alignItems: 'center', justifyContent: 'center', 
+              color: '#fff', 
+              boxShadow: '0 4px 14px rgba(59, 130, 246, 0.25)',
+              border: '1px solid rgba(255,255,255,0.2)'
+            }}>
+              <PlayCircleOutlined style={{ fontSize: 18 }} />
             </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' }}>
-              <Button
-                type="primary"
-                loading={startingProcess}
-                onClick={handleStartProcess}
-                disabled={!BACKEND_URL || startingProcess}
-              >
-                Start process
-              </Button>
-              <Button
-                icon={<ReloadOutlined />}
-                loading={batchesLoading || unmatchedLoading}
-                onClick={() => {
-                  fetchProcessDates()
-                  fetchUnmatchedRows()
-                }}
-                disabled={!BACKEND_URL || batchesLoading || startingProcess}
-              >
-                Refresh
-              </Button>
-            </div>
-
-            {lastProcessResult?.batchId ? (
-              <Alert
-                type={lastProcessResult.success === false ? 'warning' : 'success'}
-                showIcon
-                message="Last process run"
-                description={
-                  <Space direction="vertical" size={4}>
-                    {lastProcessResult.message ? <Text>{String(lastProcessResult.message)}</Text> : null}
-                    <Space wrap size={[12, 4]}>
-                      <Text>
-                        Batch: <Text code>{String(lastProcessResult.batchId)}</Text>
-                      </Text>
-                      <Text>
-                        Total sales / PDF:{' '}
-                        <Text code>
-                          {lastProcessResult.totalSalesRowCount ?? '—'} /{' '}
-                          {lastProcessResult.totalPdfRowCount ?? '—'}
-                        </Text>
-                      </Text>
-                      <Text>
-                        Unmatched before:{' '}
-                        <Text code>
-                          {lastProcessResult.unmatchedSalesBeforeCount ?? '—'} sales ·{' '}
-                          {lastProcessResult.unmatchedPdfBeforeCount ?? '—'} PDF
-                        </Text>
-                      </Text>
-                      <Text>
-                        Unmatched invoices in PDF:{' '}
-                        <Text code>{lastProcessResult.unmatchedInvoicesFoundInPdfCount ?? '—'}</Text>
-                      </Text>
-                      <Text>
-                        New matches: <Text code>{lastProcessResult.matchesSaved ?? 0}</Text>
-                      </Text>
-                      <Text>
-                        Still unmatched:{' '}
-                        <Text code>
-                          {lastProcessResult.salesRemainingCount ?? '—'} sales ·{' '}
-                          {lastProcessResult.pdfRemainingCount ?? '—'} PDF
-                        </Text>
-                      </Text>
-                    </Space>
-                  </Space>
-                }
-              />
-            ) : null}
-
-            <div style={{ width: '100%', minWidth: 0 }}>
-              <Space
-                align="center"
-                wrap
-                style={{ marginBottom: 12, width: '100%', justifyContent: 'space-between' }}
-              >
-                <Text strong>Unmatched rows</Text>
-                <Space wrap size="small">
-                  <Button
-                    type="primary"
-                    icon={<DownloadOutlined />}
-                    size="small"
-                    onClick={handleExportUnmatchedExcel}
-                    disabled={!BACKEND_URL || unmatchedLoading || !unmatchedData}
-                  >
-                    Export to Excel
-                  </Button>
-                  <Button
-                    icon={<ReloadOutlined />}
-                    size="small"
-                    loading={unmatchedLoading}
-                    onClick={() => fetchUnmatchedRows()}
-                    disabled={!BACKEND_URL || unmatchedLoading}
-                  >
-                    Refresh unmatched
-                  </Button>
-                </Space>
-              </Space>
-              <Space wrap size={16} align="start" style={{ marginBottom: 12 }}>
-                <div
-                  style={{
-                    minWidth: 240,
-                    padding: '12px 16px',
-                    border: '1px solid #f0f0f0',
-                    borderRadius: 8,
-                    background: '#fafafa',
-                  }}
-                >
-                  <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-                    Sales unmatched
-                  </Text>
-                  <Title level={3} style={{ margin: 0, lineHeight: 1 }}>
-                    {unmatchedSalesCount}
-                  </Title>
-                  {unmatchedData?.totalSalesRowCount != null ? (
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      of {unmatchedData.totalSalesRowCount} sales rows
-                      {unmatchedData?.matchedSalesRowCount != null
-                        ? ` · ${unmatchedData.matchedSalesRowCount} matched`
-                        : ''}
-                    </Text>
-                  ) : null}
-                  <div style={{ marginTop: 8 }}>
-                    <Button
-                      size="small"
-                      type={unmatchedSalesVisible ? 'default' : 'primary'}
-                      onClick={() => setUnmatchedSalesVisible((v) => !v)}
-                      disabled={unmatchedLoading}
-                    >
-                      {unmatchedSalesVisible ? 'Hide rows' : 'View rows'}
-                    </Button>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    minWidth: 240,
-                    padding: '12px 16px',
-                    border: '1px solid #f0f0f0',
-                    borderRadius: 8,
-                    background: '#fafafa',
-                  }}
-                >
-                  <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-                    PDF unmatched
-                  </Text>
-                  <Title level={3} style={{ margin: 0, lineHeight: 1 }}>
-                    {unmatchedPdfCount}
-                  </Title>
-                  {unmatchedData?.totalPdfRowCount != null ? (
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      of {unmatchedData.totalPdfRowCount} pdf rows
-                      {unmatchedData?.matchedPdfRowCount != null
-                        ? ` · ${unmatchedData.matchedPdfRowCount} matched`
-                        : ''}
-                    </Text>
-                  ) : null}
-                  <div style={{ marginTop: 8 }}>
-                    <Button
-                      size="small"
-                      type={unmatchedPdfVisible ? 'default' : 'primary'}
-                      onClick={() => setUnmatchedPdfVisible((v) => !v)}
-                      disabled={unmatchedLoading}
-                    >
-                      {unmatchedPdfVisible ? 'Hide rows' : 'View rows'}
-                    </Button>
-                  </div>
-                </div>
-              </Space>
-
-              {unmatchedSalesVisible ? (
-                <div
-                  style={{
-                    marginBottom: 16,
-                    width: '100%',
-                    minWidth: 0,
-                    maxWidth: '100%',
-                    overflowX: 'auto',
-                  }}
-                >
-                  <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                    Sales unmatched rows ({unmatchedSalesRows.length})
-                  </Text>
-                  <Table
-                    size="small"
-                    loading={unmatchedLoading}
-                    rowKey={(r, i) => String(r?.rowId ?? `sales-${i}`)}
-                    columns={unmatchedSalesColumns}
-                    dataSource={unmatchedSalesRows}
-                    pagination={{ pageSize: 10, showSizeChanger: true }}
-                    scroll={{ x: tableScrollX(unmatchedSalesColumns.length), y: 360 }}
-                    locale={{
-                      emptyText: unmatchedLoading ? 'Loading…' : 'No unmatched sales rows',
-                    }}
-                  />
-                </div>
-              ) : null}
-
-              {unmatchedPdfVisible ? (
-                <div
-                  style={{
-                    marginBottom: 16,
-                    width: '100%',
-                    minWidth: 0,
-                    maxWidth: '100%',
-                    overflowX: 'auto',
-                  }}
-                >
-                  <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                    PDF unmatched rows ({unmatchedPdfRows.length})
-                  </Text>
-                  <Table
-                    size="small"
-                    loading={unmatchedLoading}
-                    rowKey={(r, i) => String(r?.pdfRowId ?? r?.rowId ?? `pdf-${i}`)}
-                    columns={unmatchedPdfColumns}
-                    dataSource={unmatchedPdfRows}
-                    pagination={{ pageSize: 10, showSizeChanger: true }}
-                    scroll={{ x: tableScrollX(unmatchedPdfColumns.length), y: 360 }}
-                    locale={{
-                      emptyText: unmatchedLoading ? 'Loading…' : 'No unmatched PDF rows',
-                    }}
-                  />
-                </div>
-              ) : null}
-            </div>
-
-            <div style={{ width: '100%', minWidth: 0 }}>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                Match batches ({batches.length})
-              </Text>
-              <Table
-                size="small"
-                loading={batchesLoading}
-                rowKey={(record, index) => String(record?.id ?? `batch-${index}`)}
-                columns={batchColumns}
-                dataSource={batches}
-                pagination={{ pageSize: 10, showSizeChanger: true }}
-                locale={{ emptyText: 'No process batches yet' }}
-                onRow={(record) => ({
-                  onClick: () => {
-                    if (record?.id != null) setSelectedBatchId(String(record.id))
-                  },
-                  style: {
-                    cursor: record?.id != null ? 'pointer' : 'default',
-                    background:
-                      selectedBatchId != null && String(record?.id) === selectedBatchId ? '#e6f4ff' : undefined,
-                  },
-                })}
-              />
-            </div>
-
-            {selectedBatchId ? (
-              <div style={{ width: '100%', minWidth: 0 }}>
-                <Space align="start" style={{ width: '100%', justifyContent: 'space-between' }} wrap>
-                  <div>
-                    <Title level={5} style={{ margin: 0 }}>
-                      Batch detail — merged rows
-                    </Title>
-                    <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
-                      {detail?.matchedAt != null ? <>Matched at: {formatMatchedAt(detail.matchedAt)}</> : null}
-                      {(selectedBatch?.totalSalesRowCount ?? detail?.totalSalesRowCount) != null ? (
-                        <>
-                          {detail?.matchedAt != null ? ' · ' : null}
-                          Total sales / PDF: {selectedBatch?.totalSalesRowCount ?? detail?.totalSalesRowCount} /{' '}
-                          {selectedBatch?.totalPdfRowCount ?? detail?.totalPdfRowCount}
-                        </>
-                      ) : null}
-                      {(selectedBatch?.unmatchedSalesBeforeCount ?? detail?.unmatchedSalesBeforeCount) !=
-                      null ? (
-                        <>
-                          {' · '}
-                          Unmatched before:{' '}
-                          {selectedBatch?.unmatchedSalesBeforeCount ?? detail?.unmatchedSalesBeforeCount} sales /{' '}
-                          {selectedBatch?.unmatchedPdfBeforeCount ?? detail?.unmatchedPdfBeforeCount} PDF
-                        </>
-                      ) : null}
-                      {detail?.count != null ? (
-                        <>
-                          {' · '}
-                          Merged rows: {detail.count}
-                        </>
-                      ) : null}
-                      {(selectedBatch?.salesRemainingCount ?? detail?.salesRemainingCount) != null ? (
-                        <>
-                          {' · '}
-                          Sales remaining: {selectedBatch?.salesRemainingCount ?? detail?.salesRemainingCount}
-                        </>
-                      ) : null}
-                      {(selectedBatch?.pdfRemainingCount ?? detail?.pdfRemainingCount) != null ? (
-                        <>
-                          {' · '}
-                          PDF remaining: {selectedBatch?.pdfRemainingCount ?? detail?.pdfRemainingCount}
-                        </>
-                      ) : null}
-                    </Text>
-                  </div>
-                  <Space>
-                    <Button onClick={() => setSelectedBatchId(null)} disabled={detailLoading}>
-                      Close detail
-                    </Button>
-                    <Button
-                      type="primary"
-                      icon={<DownloadOutlined />}
-                      onClick={handleExportBatchExcel}
-                      disabled={!detail || detailLoading}
-                    >
-                      Export to Excel
-                    </Button>
-                  </Space>
-                </Space>
-
-                <div
-                  style={{
-                    marginTop: 12,
-                    width: '100%',
-                    minWidth: 0,
-                    maxWidth: '100%',
-                    overflowX: 'auto',
-                    WebkitOverflowScrolling: 'touch',
-                    boxSizing: 'border-box',
-                  }}
-                >
-                  <Table
-                    size="small"
-                    loading={detailLoading}
-                    rowKey="key"
-                    columns={mergedColumns}
-                    dataSource={mergedTableRows}
-                    locale={{ emptyText: detailLoading ? 'Loading…' : 'No merged rows in this batch' }}
-                    tableLayout="fixed"
-                    scroll={{ x: tableScrollX(mergedColumns.length), y: 400 }}
-                  />
-                </div>
-              </div>
-            ) : null}
+            <span style={{ letterSpacing: '-0.5px' }}>Process Data Matching</span>
+          </div>
+        } 
+        description="Run matching algorithms on uploaded sales and PDF data, and review historical match batches."
+        actions={
+          <Space size={12}>
+            <Button
+              icon={<ReloadOutlined />}
+              onClick={() => {
+                fetchProcessDates()
+                fetchUnmatchedRows()
+              }}
+              disabled={!BACKEND_URL || batchesLoading || startingProcess}
+            >
+              Refresh Data
+            </Button>
+            <Button
+              type="primary"
+              icon={<PlayCircleOutlined />}
+              loading={startingProcess}
+              onClick={handleStartProcess}
+              disabled={!BACKEND_URL || startingProcess}
+              style={{ 
+                fontWeight: 600, 
+                height: 38, 
+                padding: '0 20px', 
+                borderRadius: 8,
+              }}
+            >
+              Start Process
+            </Button>
           </Space>
-        </AppShell>
+        }
+      />
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {lastProcessResult?.batchId ? (
+          <Alert
+            type={lastProcessResult.success === false ? 'warning' : 'success'}
+            showIcon
+            message="Last process run"
+            style={{ marginBottom: 16, borderRadius: 8, border: '1px solid #bae0ff', background: '#e6f4ff' }}
+            description={
+              <Space direction="vertical" size={4}>
+                {lastProcessResult.message ? <Text>{String(lastProcessResult.message)}</Text> : null}
+                <Space wrap size={[12, 4]}>
+                  <Text>Batch: <Text code>{String(lastProcessResult.batchId)}</Text></Text>
+                  <Text>Total: <Text code>{lastProcessResult.totalSalesRowCount ?? '—'} S / {lastProcessResult.totalPdfRowCount ?? '—'} P</Text></Text>
+                  <Text>New matches: <Text code>{lastProcessResult.matchesSaved ?? 0}</Text></Text>
+                  <Text>Still unmatched: <Text code>{lastProcessResult.salesRemainingCount ?? '—'} S · {lastProcessResult.pdfRemainingCount ?? '—'} P</Text></Text>
+                </Space>
+              </Space>
+            }
+          />
+        ) : null}
+
+        <Tabs
+          activeKey={activeTab.startsWith('unmatched') ? 'unmatched' : 'history'}
+          onChange={(key) => {
+             if (key === 'unmatched') {
+                setActiveTab('unmatched-sales')
+             } else {
+                setActiveTab('history')
+             }
+          }}
+          tabBarExtraContent={
+             activeTab.startsWith('unmatched') && (
+                 <Space>
+                   <Button type="primary" icon={<DownloadOutlined />} onClick={handleExportUnmatchedExcel}>
+                     Export to Excel
+                   </Button>
+                   <Button icon={<ReloadOutlined />} onClick={fetchUnmatchedRows}>
+                     Refresh unmatched
+                   </Button>
+                 </Space>
+             )
+          }
+          style={{ marginBottom: 0 }}
+          items={[
+            { key: 'history', label: 'Match batches' },
+            { key: 'unmatched', label: 'Unmatched rows' }
+          ]}
+        />
+
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', paddingTop: 8 }}>
+          {activeTab === 'history' && (
+            <ProDataTable 
+              columns={batchColumns} 
+              fetchData={fetchBatchesData} 
+              refreshKey={batchesRefreshKey}
+              rowKey={(record) => String(record?.id || record?.key)}
+              globalSearchPlaceholder="Search process batches..."
+            />
+          )}
+
+          {activeTab.startsWith('unmatched') && (
+             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+                   <Card 
+                     style={{ flex: 1, borderRadius: 8, border: activeTab === 'unmatched-sales' ? '2px solid var(--exim-primary, #1677ff)' : '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.02)' }} 
+                     bodyStyle={{ padding: '12px 16px' }}
+                     onClick={() => setActiveTab('unmatched-sales')}
+                   >
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div>
+                          <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>Sales unmatched</Text>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
+                             <Title level={2} style={{ margin: 0, fontSize: 24, color: 'var(--exim-gray-800)' }}>{unmatchedSalesCount}</Title>
+                             <Text type="secondary" style={{ fontSize: 12 }}>
+                                of {unmatchedData?.totalSalesRowCount || 0} sales rows · {unmatchedData ? (unmatchedData.totalSalesRowCount - unmatchedSalesCount) : 0} matched
+                             </Text>
+                          </div>
+                       </div>
+                       <Button size="middle" type={activeTab === 'unmatched-sales' ? 'primary' : 'default'} style={{ fontWeight: 500 }}>View rows</Button>
+                     </div>
+                   </Card>
+
+                   <Card 
+                     style={{ flex: 1, borderRadius: 8, border: activeTab === 'unmatched-pdf' ? '2px solid var(--exim-primary, #1677ff)' : '1px solid #e2e8f0', cursor: 'pointer', boxShadow: '0 1px 4px rgba(0,0,0,0.02)' }} 
+                     bodyStyle={{ padding: '12px 16px' }}
+                     onClick={() => setActiveTab('unmatched-pdf')}
+                   >
+                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                       <div>
+                          <Text type="secondary" style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>PDF unmatched</Text>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
+                             <Title level={2} style={{ margin: 0, fontSize: 24, color: 'var(--exim-gray-800)' }}>{unmatchedPdfCount}</Title>
+                             <Text type="secondary" style={{ fontSize: 12 }}>
+                                of {unmatchedData?.totalPdfRowCount || 0} pdf rows · {unmatchedData ? (unmatchedData.totalPdfRowCount - unmatchedPdfCount) : 0} matched
+                             </Text>
+                          </div>
+                       </div>
+                       <Button size="middle" type={activeTab === 'unmatched-pdf' ? 'primary' : 'default'} style={{ fontWeight: 500 }}>View rows</Button>
+                     </div>
+                   </Card>
+                </div>
+
+                {activeTab === 'unmatched-sales' && (
+                  <ProDataTable 
+                    columns={unmatchedSalesColumns} 
+                    fetchData={fetchUnmatchedSalesData} 
+                    refreshKey={unmatchedRefreshKey}
+                    rowKey={(r, i) => String(r?.rowId ?? `sales-${i}`)}
+                    globalSearchPlaceholder="Search unmatched sales..."
+                  />
+                )}
+                {activeTab === 'unmatched-pdf' && (
+                  <ProDataTable 
+                    columns={unmatchedPdfColumns} 
+                    fetchData={fetchUnmatchedPdfData} 
+                    refreshKey={unmatchedRefreshKey}
+                    rowKey={(r, i) => String(r?.pdfRowId ?? r?.rowId ?? `pdf-${i}`)}
+                    globalSearchPlaceholder="Search unmatched PDFs..."
+                  />
+                )}
+             </div>
+          )}
+        </div>
+      </div>
+
+      <Drawer
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 18, fontWeight: 600 }}>Batch Detail: Merged Rows</span>
+            {detail?.matchedAt != null && <Tag color="blue">Matched: {formatMatchedAt(detail.matchedAt)}</Tag>}
+            {detail?.count != null && <Tag color="green">Merged Rows: {detail.count}</Tag>}
+          </div>
+        }
+        placement="right"
+        width="90%"
+        onClose={() => setSelectedBatchId(null)}
+        open={!!selectedBatchId}
+        extra={
+          <Button type="primary" icon={<DownloadOutlined />} onClick={handleExportBatchExcel} disabled={!detail || detailLoading}>
+            Export Full Batch
+          </Button>
+        }
+        bodyStyle={{ padding: 0, display: 'flex', flexDirection: 'column' }}
+      >
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', background: '#f8fafc', padding: '16px' }}>
+          <ProDataTable 
+            columns={mergedColumns} 
+            fetchData={fetchMergedData} 
+            refreshKey={detailRefreshKey}
+            rowKey="key"
+            globalSearchPlaceholder="Search merged rows..."
+          />
+        </div>
+      </Drawer>
+    </AppShell>
   )
 }
