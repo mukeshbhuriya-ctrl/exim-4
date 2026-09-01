@@ -1,10 +1,11 @@
 import { DownloadOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Input, Layout, Select, Space, Table, Typography, message } from 'antd'
-import { useCallback, useMemo, useState } from 'react'
+import { Button, ConfigProvider, Input, Layout, Select, Space, Table, Typography, message, Tabs, Card, Tag } from 'antd'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
+import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -167,20 +168,30 @@ export default function CompanyAdminChaPage() {
   const [mergingToSales, setMergingToSales] = useState(false)
   const [chaDataMeta, setChaDataMeta] = useState(null)
   const [chaDataRows, setChaDataRows] = useState([])
-  const [chaTablePage, setChaTablePage] = useState(1)
-  const [chaTablePageSize, setChaTablePageSize] = useState(20)
+  const [tableRefreshKey, setTableRefreshKey] = useState(0)
+
+  useEffect(() => {
+    setTableRefreshKey((prev) => prev + 1)
+  }, [chaDataRows])
 
   const chaDataColumns = useMemo(() => buildColumnsFromRows(chaDataRows), [chaDataRows])
 
-  const handleChaTablePaginationChange = useCallback((page, pageSize) => {
-    setChaTablePage(page)
-    setChaTablePageSize(pageSize)
-  }, [])
-
-  const handleChaTableSizeChange = useCallback((_, size) => {
-    setChaTablePage(1)
-    setChaTablePageSize(size)
-  }, [])
+  const fetchMainTableData = useCallback(async ({ page, limit, search }) => {
+    let filtered = chaDataRows
+    if (search) {
+      const lowerSearch = search.toLowerCase()
+      filtered = filtered.filter((row) =>
+        Object.values(row).some((val) => String(val).toLowerCase().includes(lowerSearch))
+      )
+    }
+    const total = filtered.length
+    const start = (page - 1) * limit
+    const paginated = filtered.slice(start, start + limit)
+    return {
+      data: paginated,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    }
+  }, [chaDataRows])
 
   const fetchChaData = useCallback(async () => {
     if (!BACKEND_URL) {
@@ -211,7 +222,6 @@ export default function CompanyAdminChaPage() {
       }
       const rows = normalizeChaRows(data)
       setChaDataRows(rows)
-      setChaTablePage(1)
       const metaMonth = data?.sbMonthAndYear ?? null
       if (metaMonth) {
         const parsed = parseSbMonthAndYear(metaMonth)
@@ -334,198 +344,237 @@ export default function CompanyAdminChaPage() {
     }
   }, [BACKEND_URL, filterMonthAbbr, filterYear, filterGstin])
 
+  const tabItems = [
+    {
+      key: 'data',
+      label: 'Data Retrieval',
+      children: (
+        <Space direction="vertical" size={24} style={{ width: '100%', minWidth: 0 }}>
+          <Card bordered={false} style={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.03)' }} bodyStyle={{ padding: 24 }}>
+            <Space direction="vertical" size={16} style={{ width: '100%' }}>
+              <div>
+                <Title level={5} style={{ margin: 0, color: '#1e293b' }}>Filter & Load CHA Data</Title>
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  GET <Text code>/api/company/admin/cha/get-cha-data</Text> — optional month/year (last {YEARS_BACK} years) and <Text code>gstin</Text>.
+                </Text>
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <Space direction="vertical" size={4}>
+                  <Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>Month / Year</Text>
+                  <Space size={8}>
+                    <Select
+                      placeholder="Month"
+                      value={filterMonthAbbr}
+                      onChange={setFilterMonthAbbr}
+                      options={MONTH_SELECT_OPTIONS}
+                      allowClear
+                      style={{ width: 100 }}
+                    />
+                    <Select
+                      placeholder="Year"
+                      value={filterYear}
+                      onChange={setFilterYear}
+                      options={yearOptions}
+                      allowClear
+                      style={{ width: 100 }}
+                    />
+                  </Space>
+                </Space>
+                <Space direction="vertical" size={4}>
+                  <Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>GSTIN</Text>
+                  <Input
+                    placeholder="e.g. 24AAFCI0903C1ZB"
+                    value={filterGstin}
+                    onChange={(e) => setFilterGstin(e.target.value)}
+                    onPressEnter={fetchChaData}
+                    allowClear
+                    style={{ width: 240 }}
+                  />
+                </Space>
+                <Space style={{ marginBottom: 1 }}>
+                  <Button type="primary" loading={chaDataLoading} onClick={fetchChaData} disabled={!BACKEND_URL} style={{ borderRadius: 6 }}>
+                    Load CHA data
+                  </Button>
+                  <Button
+                    icon={<DownloadOutlined />}
+                    onClick={handleExportChaExcel}
+                    disabled={!chaDataRows.length || chaDataLoading || mergingToSales}
+                    style={{ borderRadius: 6 }}
+                  >
+                    Export to Excel
+                  </Button>
+                  <Button
+                    loading={mergingToSales}
+                    onClick={handleMergeChaDataToSales}
+                    disabled={!BACKEND_URL || chaDataLoading || mergingToSales}
+                    style={{ borderRadius: 6 }}
+                  >
+                    Merge to Sales
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setFilterMonthAbbr(undefined)
+                      setFilterYear(undefined)
+                      setFilterGstin('')
+                      setChaDataRows([])
+                      setChaDataMeta(null)
+                    }}
+                    disabled={chaDataLoading || mergingToSales}
+                    style={{ borderRadius: 6 }}
+                  >
+                    Clear
+                  </Button>
+                </Space>
+              </div>
+              {chaDataMeta ? (
+                <div style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                  <Space size="small">
+                    <Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>Month:</Text>
+                    <Tag color="blue" style={{ margin: 0 }}>{chaDataMeta.sbMonthAndYear ?? '—'}</Tag>
+                  </Space>
+                  <Space size="small">
+                    <Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>GSTIN:</Text>
+                    <Text strong>{chaDataMeta.gstin || '—'}</Text>
+                  </Space>
+                  <Space size="small">
+                    <Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>Count:</Text>
+                    <Text strong>{chaDataMeta.count ?? chaDataRows.length}</Text>
+                  </Space>
+                </div>
+              ) : null}
+            </Space>
+          </Card>
+
+          {chaDataRows.length > 0 || chaDataLoading ? (
+            <div style={{ animation: 'fadeIn 0.3s' }}>
+              <ProDataTable
+                columns={chaDataColumns}
+                fetchData={fetchMainTableData}
+                refreshKey={tableRefreshKey}
+                rowKey={(r, i) => String(r?._id ?? `cha-row-${i}-${r?.sbNo ?? ''}`)}
+                globalSearchPlaceholder="Search loaded CHA data..."
+                showSelectionColumn={false}
+              />
+            </div>
+          ) : (
+            <div style={{ padding: '60px 20px', textAlign: 'center', background: '#f8fafc', borderRadius: 12, border: '2px solid #e2e8f0', animation: 'fadeIn 0.3s' }}>
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ width: 48, height: 48, background: '#e0e7ff', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+                  <DownloadOutlined style={{ fontSize: 20, color: '#4f46e5' }} />
+                </div>
+              </div>
+              <Title level={5} style={{ color: '#1e293b', marginBottom: 8 }}>No CHA Data Loaded</Title>
+              <Text type="secondary">Use the filters above and click "Load CHA data" to view records.</Text>
+            </div>
+          )}
+        </Space>
+      ),
+    },
+    {
+      key: 'process',
+      label: 'Process Execution',
+      children: (
+        <Space direction="vertical" size={24} style={{ width: '100%' }}>
+          <Card bordered={false} style={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.03)' }} bodyStyle={{ padding: 24 }}>
+            <Space direction="vertical" size={24} style={{ width: '100%' }}>
+              
+              {/* Standard Process */}
+              <div>
+                <Title level={5} style={{ margin: 0, color: '#1e293b', marginBottom: 8 }}>Standard Monthly Process</Title>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 16, fontSize: 13 }}>
+                  Run the current-month CHA workflow with full OTP verification.
+                </Text>
+                <Button
+                  type="primary"
+                  loading={loadingWithOtp}
+                  onClick={handleStartCurrentMonthProcess}
+                  disabled={!BACKEND_URL || loadingWithoutOtp}
+                  style={{ borderRadius: 6, boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)' }}
+                >
+                  Start current month process
+                </Button>
+              </div>
+
+              <div style={{ height: 1, background: '#e2e8f0', width: '100%' }} />
+
+              {/* Without OTP Process */}
+              <div>
+                <Title level={5} style={{ margin: 0, color: '#1e293b', marginBottom: 8 }}>Unattended Process (Without OTP)</Title>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 16, fontSize: 13 }}>
+                  Run the workflow without OTP. Optionally provide <Text code>sbMonthAndYear</Text>, <Text code>month</Text>, and <Text code>sectionIndex</Text>.
+                </Text>
+                
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                  <Space direction="vertical" size={4}>
+                    <Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>Target Month / Year</Text>
+                    <Space size={8}>
+                      <Select
+                        placeholder="Month"
+                        value={processMonthAbbr}
+                        onChange={setProcessMonthAbbr}
+                        options={MONTH_SELECT_OPTIONS}
+                        style={{ width: 100 }}
+                        disabled={loadingWithoutOtp}
+                      />
+                      <Select
+                        placeholder="Year"
+                        value={processYear}
+                        onChange={setProcessYear}
+                        options={yearOptions}
+                        style={{ width: 100 }}
+                        disabled={loadingWithoutOtp}
+                      />
+                    </Space>
+                  </Space>
+                  <Space direction="vertical" size={4}>
+                    <Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>Section Index</Text>
+                    <Input
+                      placeholder="e.g. 0"
+                      value={processWithoutOtpSectionIndex}
+                      onChange={(e) => setProcessWithoutOtpSectionIndex(e.target.value)}
+                      allowClear
+                      style={{ width: 160 }}
+                      disabled={loadingWithoutOtp}
+                    />
+                  </Space>
+                  <Button
+                    loading={loadingWithoutOtp}
+                    onClick={handleStartCurrentMonthProcessWithoutOtp}
+                    disabled={!BACKEND_URL || loadingWithOtp}
+                    style={{ borderRadius: 6, marginBottom: 1 }}
+                  >
+                    Start process (without OTP)
+                  </Button>
+                </div>
+              </div>
+
+            </Space>
+          </Card>
+        </Space>
+      ),
+    },
+  ]
+
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <div>
-              <Title level={3} style={{ margin: 0 }}>
-                CHA — current month
-              </Title>
-              <Text type="secondary">
-                Run the current-month CHA workflow with or without OTP verification.
-              </Text>
-            </div>
-            <Space direction="vertical" size="small" style={{ width: '100%' }}>
-              <Button
-                type="primary"
-                loading={loadingWithOtp}
-                onClick={handleStartCurrentMonthProcess}
-                disabled={!BACKEND_URL || loadingWithoutOtp}
-              >
-                Start current month process
-              </Button>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Without OTP — optional <Text code>sbMonthAndYear</Text>, <Text code>month</Text>, and{' '}
-                <Text code>sectionIndex</Text> as query parameters.
-              </Text>
-              <Space wrap align="center">
-                <Select
-                  placeholder="Month"
-                  value={processMonthAbbr}
-                  onChange={setProcessMonthAbbr}
-                  options={MONTH_SELECT_OPTIONS}
-                  style={{ width: 100 }}
-                  disabled={loadingWithoutOtp}
-                />
-                <Select
-                  placeholder="Year"
-                  value={processYear}
-                  onChange={setProcessYear}
-                  options={yearOptions}
-                  style={{ width: 100 }}
-                  disabled={loadingWithoutOtp}
-                />
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  Total: {monthYearPeriodTotal} periods · last {YEARS_BACK} years
-                  {composeSbMonthAndYear(processMonthAbbr, processYear) ? (
-                    <>
-                      {' '}
-                      → <Text code>{composeSbMonthAndYear(processMonthAbbr, processYear)}</Text>
-                    </>
-                  ) : null}
-                </Text>
-                <Input
-                  placeholder="sectionIndex (e.g. 0)"
-                  value={processWithoutOtpSectionIndex}
-                  onChange={(e) => setProcessWithoutOtpSectionIndex(e.target.value)}
-                  allowClear
-                  style={{ width: 160 }}
-                  disabled={loadingWithoutOtp}
-                />
-                <Button
-                  loading={loadingWithoutOtp}
-                  onClick={handleStartCurrentMonthProcessWithoutOtp}
-                  disabled={!BACKEND_URL || loadingWithOtp}
-                >
-                  Start current month process (without OTP)
-                </Button>
-              </Space>
-            </Space>
-
-            <div style={{ width: '100%', minWidth: 0 }}>
-              <Title level={5} style={{ margin: 0, marginBottom: 8 }}>
-                CHA data
-              </Title>
-              <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                GET <Text code>/api/company/admin/cha/get-cha-data</Text> — optional month/year (last{' '}
-                {YEARS_BACK} years) and <Text code>gstin</Text>.
-              </Text>
-              <Space wrap align="center" style={{ marginBottom: 12 }}>
-                <Select
-                  placeholder="Month"
-                  value={filterMonthAbbr}
-                  onChange={setFilterMonthAbbr}
-                  options={MONTH_SELECT_OPTIONS}
-                  allowClear
-                  style={{ width: 100 }}
-                />
-                <Select
-                  placeholder="Year"
-                  value={filterYear}
-                  onChange={setFilterYear}
-                  options={yearOptions}
-                  allowClear
-                  style={{ width: 100 }}
-                />
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  Total: {monthYearPeriodTotal} periods
-                  {composeSbMonthAndYear(filterMonthAbbr, filterYear) ? (
-                    <>
-                      {' '}
-                      → <Text code>{composeSbMonthAndYear(filterMonthAbbr, filterYear)}</Text>
-                    </>
-                  ) : null}
-                </Text>
-                <Input
-                  placeholder="GSTIN (e.g. 24AAFCI0903C1ZB)"
-                  value={filterGstin}
-                  onChange={(e) => setFilterGstin(e.target.value)}
-                  onPressEnter={fetchChaData}
-                  allowClear
-                  style={{ width: 260 }}
-                />
-                <Button type="primary" loading={chaDataLoading} onClick={fetchChaData} disabled={!BACKEND_URL}>
-                  Load CHA data
-                </Button>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={handleExportChaExcel}
-                  disabled={!chaDataRows.length || chaDataLoading || mergingToSales}
-                >
-                  Export to Excel
-                </Button>
-                <Button
-                  loading={mergingToSales}
-                  onClick={handleMergeChaDataToSales}
-                  disabled={!BACKEND_URL || chaDataLoading || mergingToSales}
-                >
-                  Merge CHA data to sales
-                </Button>
-                <Button
-                  onClick={() => {
-                    setFilterMonthAbbr(undefined)
-                    setFilterYear(undefined)
-                    setFilterGstin('')
-                    setChaDataRows([])
-                    setChaDataMeta(null)
-                    setChaTablePage(1)
-                  }}
-                  disabled={chaDataLoading || mergingToSales}
-                >
-                  Clear
-                </Button>
-              </Space>
-
-              {chaDataMeta ? (
-                <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-                  Month: <Text code>{chaDataMeta.sbMonthAndYear ?? '—'}</Text>
-                  {' · '}
-                  GSTIN filter: <Text code>{chaDataMeta.gstin ?? '—'}</Text>
-                  {' · '}
-                  Count: <Text strong>{chaDataMeta.count ?? chaDataRows.length}</Text>
-                  {chaDataRows.length !== chaDataMeta.count ? (
-                    <>
-                      {' '}
-                      (showing {chaDataRows.length} row{chaDataRows.length === 1 ? '' : 's'})
-                    </>
-                  ) : null}
-                </Text>
-              ) : null}
-
-              <ConfigProvider getPopupContainer={() => document.body}>
-                <div
-                  style={{
-                    width: '100%',
-                    minWidth: 0,
-                    maxWidth: '100%',
-                    overflowX: 'auto',
-                    overflowY: 'visible',
-                  }}
-                >
-                  <Table
-                  size="small"
-                  loading={chaDataLoading}
-                  rowKey={(r, i) => String(r?._id ?? `cha-row-${i}-${r?.sbNo ?? ''}`)}
-                  columns={chaDataColumns}
-                  dataSource={chaDataRows}
-                  pagination={{
-                    current: chaTablePage,
-                    pageSize: chaTablePageSize,
-                    total: chaDataRows.length,
-                    showSizeChanger: true,
-                    pageSizeOptions: [10, 20, 50, 100],
-                    showTotal: (total, range) =>
-                      range[1] ? `${range[0]}-${range[1]} of ${total}` : `${total} rows`,
-                    onChange: handleChaTablePaginationChange,
-                    onShowSizeChange: handleChaTableSizeChange,
-                  }}
-                  scroll={{ x: 'max-content', y: 480 }}
-                  locale={{ emptyText: chaDataLoading ? 'Loading…' : 'Load CHA data to see rows' }}
-                />
-                </div>
-              </ConfigProvider>
-            </div>
-          </Space>
-        </AppShell>
+      <Space direction="vertical" size={16} style={{ width: '100%', minWidth: 0 }}>
+        <PageHeader
+          title="Monthly CHA Operations"
+          description="Manage current-month CHA workflows, retrieve data, and export to Excel."
+        />
+        <ConfigProvider
+          theme={{
+            token: { colorPrimary: '#2563eb', borderRadius: 6, colorText: '#1e293b' },
+            components: {
+              Table: { headerBg: '#f1f5f9', headerColor: '#334155', headerBorderRadius: 8, borderColor: '#e2e8f0', rowHoverBg: '#f8fafc', cellPaddingBlock: 12 },
+              Button: { primaryColor: '#ffffff', colorPrimary: '#2563eb', colorPrimaryHover: '#1d4ed8', colorPrimaryActive: '#1e40af' },
+              Tabs: { itemColor: '#64748b', itemSelectedColor: '#2563eb', itemHoverColor: '#3b82f6', titleFontSize: 15 },
+            }
+          }}
+        >
+          <Tabs defaultActiveKey="data" items={tabItems} style={{ marginTop: -8 }} />
+        </ConfigProvider>
+      </Space>
+    </AppShell>
   )
 }
