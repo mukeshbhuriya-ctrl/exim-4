@@ -5,7 +5,7 @@ import {
   HolderOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
-import { Button, Input, Layout, Select, Space, Table, Typography, message } from 'antd'
+import { Button, Input, Layout, Select, Space, Table, Typography, message, ConfigProvider, Card, Tag } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
@@ -683,102 +683,116 @@ export default function CompanyAdminJvRodtpFormatPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-            <div>
-              <Title level={3} style={{ margin: 0 }}>
-                JV RODTP Format
-              </Title>
-              <Text type="secondary">Configure posting/account fields and row-level value/dropdown mapping.</Text>
-              <br />
-              <Text type="secondary">
-                System headers are auto-added and locked: {SYSTEM_HEADERS.join(', ')}
-              </Text>
-            </div>
+      <Space direction="vertical" size={16} style={{ width: '100%', minWidth: 0 }}>
+        <PageHeader
+          title="JV RODTP Format"
+          description="Configure posting/account fields and row-level value/dropdown mapping. System headers are auto-added and locked."
+          actions={
+            <Button type="primary" onClick={handleSaveFormat} loading={submitting || loadingFormat} style={{ borderRadius: 6, boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)' }}>
+              {formatMode === 'update' ? 'Update JV RODTP Format' : 'Create JV RODTP Format'}
+            </Button>
+          }
+        />
 
-            <Space direction="vertical" size="small" style={{ width: '100%' }}>
-              <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                <Title level={5} style={{ margin: 0 }}>
-                  Posting / Account
-                </Title>
-                <Button
-                  icon={<PlusOutlined />}
-                  onClick={() =>
-                    setPostingAccounts((prev) => [
-                      ...prev,
-                      {
-                        key: `pa-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-                        postingKey: '',
-                        accountNo: '',
-                      },
-                    ])
-                  }
-                >
-                  Add Rows
-                </Button>
-              </Space>
-
-              <Table
-                rowKey="key"
-                columns={postingColumns}
-                dataSource={postingAccounts}
-                pagination={false}
-                scroll={{ x: 680 }}
-                size="small"
-              />
-            </Space>
-
-            <Space direction="vertical" size="small" style={{ width: '100%' }}>
-              <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                <Title level={5} style={{ margin: 0 }}>
-                  Rows
-                </Title>
-                <Button icon={<PlusOutlined />} onClick={() => setRows((prev) => [...prev, createRow()])}>
-                  Add row
-                </Button>
-              </Space>
-
-              <Table
-                rowKey="key"
-                columns={columns}
-                dataSource={rows}
-                pagination={false}
-                scroll={{ x: 1100 }}
-                size="small"
-                onRow={getMappingTableRowProps}
-              />
-            </Space>
-
-            <Space direction="vertical" size="small" style={{ width: '100%' }}>
-              <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                <Title level={5} style={{ margin: 0 }}>
-                  Horizontal Header Table
-                </Title>
-                <Space>
-                  <Button icon={<PlusOutlined />} onClick={insertHorizontalDefaultRow}>
-                    Insert default row
+        <ConfigProvider
+          theme={{
+            token: { colorPrimary: '#2563eb', borderRadius: 6, colorText: '#1e293b' },
+            components: {
+              Table: { headerBg: '#f1f5f9', headerColor: '#334155', headerBorderRadius: 8, borderColor: '#e2e8f0', rowHoverBg: '#f8fafc', cellPaddingBlock: 12 },
+              Button: { primaryColor: '#ffffff', colorPrimary: '#2563eb', colorPrimaryHover: '#1d4ed8', colorPrimaryActive: '#1e40af' },
+            }
+          }}
+        >
+          <Space direction="vertical" size={24} style={{ width: '100%' }}>
+            {/* Section 1: Posting / Account */}
+            <Card bordered={false} style={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.03)' }} bodyStyle={{ padding: 24 }}>
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <Title level={5} style={{ margin: 0, color: '#1e293b' }}>Posting / Account</Title>
+                    <Text type="secondary" style={{ fontSize: 13 }}>Map your posting keys and account numbers.</Text>
+                  </div>
+                  <Button
+                    icon={<PlusOutlined />}
+                    onClick={() =>
+                      setPostingAccounts((prev) => [
+                        ...prev,
+                        {
+                          key: `pa-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+                          postingKey: '',
+                          accountNo: '',
+                        },
+                      ])
+                    }
+                  >
+                    Add Row
                   </Button>
-                  <Button icon={<PlusOutlined />} onClick={addHorizontalRow}>
-                    Add row
-                  </Button>
-                </Space>
+                </div>
+                <Table
+                  rowKey="key"
+                  columns={postingColumns}
+                  dataSource={postingAccounts}
+                  pagination={false}
+                  scroll={{ x: 680 }}
+                  size="small"
+                />
               </Space>
+            </Card>
 
-              <Table
-                rowKey="key"
-                columns={horizontalHeaderColumns}
-                dataSource={horizontalRows}
-                pagination={false}
-                scroll={{ x: 'max-content' }}
-                size="small"
-              />
-            </Space>
+            {/* Section 2: Rows */}
+            <Card bordered={false} style={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.03)' }} bodyStyle={{ padding: 24 }}>
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <Title level={5} style={{ margin: 0, color: '#1e293b' }}>Format Rows</Title>
+                    <Text type="secondary" style={{ fontSize: 13 }}>Drag to reorder mapping rows. System headers are locked.</Text>
+                  </div>
+                  <Button icon={<PlusOutlined />} onClick={() => setRows((prev) => [...prev, createRow()])}>
+                    Add Row
+                  </Button>
+                </div>
+                <Table
+                  rowKey="key"
+                  columns={columns}
+                  dataSource={rows}
+                  pagination={false}
+                  scroll={{ x: 1100 }}
+                  size="small"
+                  onRow={getMappingTableRowProps}
+                />
+              </Space>
+            </Card>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button type="primary" onClick={handleSaveFormat} loading={submitting || loadingFormat}>
-                {formatMode === 'update' ? 'Update JV RODTP Format' : 'Create JV RODTP Format'}
-              </Button>
-            </div>
+            {/* Section 3: Horizontal Header Table */}
+            <Card bordered={false} style={{ borderRadius: 12, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.03)' }} bodyStyle={{ padding: 24 }}>
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <Title level={5} style={{ margin: 0, color: '#1e293b' }}>Horizontal Header Mapping</Title>
+                    <Text type="secondary" style={{ fontSize: 13 }}>Configure special default values per column.</Text>
+                  </div>
+                  <Space>
+                    <Button icon={<PlusOutlined />} onClick={insertHorizontalDefaultRow}>
+                      Insert Defaults
+                    </Button>
+                    <Button icon={<PlusOutlined />} onClick={addHorizontalRow}>
+                      Add Row
+                    </Button>
+                  </Space>
+                </div>
+                <Table
+                  rowKey="key"
+                  columns={horizontalHeaderColumns}
+                  dataSource={horizontalRows}
+                  pagination={false}
+                  scroll={{ x: 'max-content' }}
+                  size="small"
+                />
+              </Space>
+            </Card>
           </Space>
-        </AppShell>
+        </ConfigProvider>
+      </Space>
+    </AppShell>
   )
 }
