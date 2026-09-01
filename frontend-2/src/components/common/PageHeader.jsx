@@ -31,12 +31,12 @@ export default function PageHeader({ title, description, actions, breadcrumbs })
       ) : null}
       <div style={{
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'space-between',
-        gap: 8,
+        gap: 16,
         flexWrap: 'wrap',
       }}>
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
           <h2 style={{
             fontSize: 20,
             fontWeight: 700,

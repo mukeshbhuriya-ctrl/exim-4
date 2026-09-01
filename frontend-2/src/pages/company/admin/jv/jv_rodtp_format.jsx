@@ -79,7 +79,7 @@ function reorderRowsByKey(prev, fromKey, toKey) {
   return next
 }
 
-export default function CompanyAdminJvRodtpFormatPage() {
+export function JvRodtpFormatContent() {
   const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '')
   const draggedMappingKeyRef = useRef(null)
   const [postingAccounts, setPostingAccounts] = useState([
@@ -682,8 +682,8 @@ export default function CompanyAdminJvRodtpFormatPage() {
   }
 
   return (
-    <AppShell sidebar={<CompanySidebar />}>
-      <Space direction="vertical" size={16} style={{ width: '100%', minWidth: 0 }}>
+    <>
+      <Space direction="vertical" size={16} style={{ width: '100%', minWidth: 0, marginTop: -8 }}>
         <PageHeader
           title="JV RODTP Format"
           description="Configure posting/account fields and row-level value/dropdown mapping. System headers are auto-added and locked."
@@ -793,6 +793,14 @@ export default function CompanyAdminJvRodtpFormatPage() {
           </Space>
         </ConfigProvider>
       </Space>
+    </>
+  )
+}
+
+export default function CompanyAdminJvRodtpFormatPage() {
+  return (
+    <AppShell sidebar={<CompanySidebar />}>
+      <JvRodtpFormatContent />
     </AppShell>
   )
 }

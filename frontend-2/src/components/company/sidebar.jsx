@@ -43,7 +43,7 @@ const DGFT_PATHS = [
   '/admin/pdf/dgft',
   '/admin/dgft',
 ]
-const JV_PATHS = ['/admin/jv-dbks-format', '/admin/jv-dbk', '/admin/jv-rodtp-format', '/admin/jv-rodtp']
+const JV_PATHS = ['/admin/jv-dbk', '/admin/jv-rodtp']
 const CHA_PATHS = ['/admin/cha/process']
 const CONFIGURE_PATHS = [
   '/admin/configure/sales',
@@ -143,10 +143,8 @@ const menuItems = [
     icon: <AccountBookOutlined />,
     label: 'Journal Voucher',
     children: [
-      { key: '/admin/jv-dbks-format', label: 'DBK Format' },
-      { key: '/admin/jv-dbk', label: 'JV DBK' },
-      { key: '/admin/jv-rodtp-format', label: 'RoDTEP Format' },
-      { key: '/admin/jv-rodtp', label: 'JV RoDTEP' },
+      { key: '/admin/jv-dbk', label: 'DBK' },
+      { key: '/admin/jv-rodtp', label: 'RoDTEP' },
     ],
   },
   {

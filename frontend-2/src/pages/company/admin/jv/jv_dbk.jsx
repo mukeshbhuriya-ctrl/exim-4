@@ -1,9 +1,12 @@
 import { DownloadOutlined, EyeOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, Modal, Space, Table, Tag, Typography, message } from 'antd'
+import { Button, Modal, Space, Table, Tag, Typography, message, ConfigProvider, Tabs } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
+import PageHeader from '../../../../components/common/PageHeader.jsx'
+import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
+import { JvDbkFormatContent } from './jv_dbk_format.jsx'
 
 const { Title, Text } = Typography
 
@@ -184,14 +187,14 @@ function getColumnsFromRows(rows) {
   ]
 }
 
-export default function CompanyAdminJvDbkPage() {
+export function JvDbkDataContent() {
   const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '')
 
   const [processing, setProcessing] = useState(false)
   const [loadingDates, setLoadingDates] = useState(false)
   const [dateRows, setDateRows] = useState([])
+  const [view, setView] = useState('table')
   const [viewModal, setViewModal] = useState({
-    open: false,
     loading: false,
     exporting: false,
     dateId: '',
@@ -199,6 +202,51 @@ export default function CompanyAdminJvDbkPage() {
     sapNo: '',
     rows: [],
   })
+
+  const [tableRefreshKey, setTableRefreshKey] = useState(0)
+  const [modalRefreshKey, setModalRefreshKey] = useState(0)
+
+  useEffect(() => {
+    setTableRefreshKey((prev) => prev + 1)
+  }, [dateRows])
+
+  useEffect(() => {
+    setModalRefreshKey((prev) => prev + 1)
+  }, [viewModal.rows])
+
+  const fetchMainTableData = useCallback(async ({ page, limit, search }) => {
+    let filtered = dateRows
+    if (search) {
+      const lowerSearch = search.toLowerCase()
+      filtered = filtered.filter((row) =>
+        Object.values(row).some((val) => String(val).toLowerCase().includes(lowerSearch))
+      )
+    }
+    const total = filtered.length
+    const start = (page - 1) * limit
+    const paginated = filtered.slice(start, start + limit)
+    return {
+      data: paginated,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    }
+  }, [dateRows])
+
+  const fetchModalTableData = useCallback(async ({ page, limit, search }) => {
+    let filtered = viewModal.rows
+    if (search) {
+      const lowerSearch = search.toLowerCase()
+      filtered = filtered.filter((row) =>
+        Object.values(row).some((val) => String(val).toLowerCase().includes(lowerSearch))
+      )
+    }
+    const total = filtered.length
+    const start = (page - 1) * limit
+    const paginated = filtered.slice(start, start + limit)
+    return {
+      data: paginated,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    }
+  }, [viewModal.rows])
 
   const fetchDates = useCallback(async () => {
     if (!BACKEND_URL) return
@@ -278,8 +326,8 @@ export default function CompanyAdminJvDbkPage() {
       const dateId = String(record?.id ?? record?.dayKey ?? '').trim()
       if (!dateId) return
 
+      setView('form')
       setViewModal({
-        open: true,
         loading: true,
         exporting: false,
         dateId,
@@ -395,85 +443,138 @@ export default function CompanyAdminJvDbkPage() {
   )
 
   return (
-    <AppShell sidebar={<CompanySidebar />}>
-      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <div>
-          <Title level={3} style={{ margin: 0 }}>
-            JV DBK
-          </Title>
-          <Text type="secondary">Run JV DBK process and view date-wise generated rows.</Text>
-        </div>
+    <>
+      <Space direction="vertical" size={16} style={{ width: '100%', minWidth: 0, marginTop: -8 }}>
+        {view === 'form' ? (
+          <>
+            <PageHeader
+              title={`JV DBK Data — ${viewModal.dayKey || '—'}`}
+              description="Detailed rows for the selected date."
+              actions={
+                <Space>
+                  <Button onClick={() => { setView('table'); setViewModal({ loading: false, exporting: false, dateId: '', dayKey: '', sapNo: '', rows: [] }); }} style={{ borderRadius: 6 }}>
+                    Back to Dates
+                  </Button>
+                  <Button type="primary" icon={<DownloadOutlined />} loading={viewModal.exporting} onClick={handleExportFromModal} style={{ borderRadius: 6, boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)' }}>
+                    Export Excel
+                  </Button>
+                </Space>
+              }
+            />
+            <ConfigProvider
+              theme={{
+                token: { colorPrimary: '#2563eb', borderRadius: 6, colorText: '#1e293b' },
+                components: {
+                  Table: { headerBg: '#f1f5f9', headerColor: '#334155', headerBorderRadius: 8, borderColor: '#e2e8f0', rowHoverBg: '#f8fafc', cellPaddingBlock: 12 },
+                  Button: { primaryColor: '#ffffff', colorPrimary: '#2563eb', colorPrimaryHover: '#1d4ed8', colorPrimaryActive: '#1e40af' },
+                }
+              }}
+            >
+              <Space direction="vertical" size={16} style={{ width: '100%' }}>
+                <div style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                  <Space size="small">
+                    <Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>Date:</Text>
+                    <Tag color="blue" style={{ margin: 0, fontSize: 13, padding: '2px 8px' }}>{viewModal.dayKey || '—'}</Tag>
+                  </Space>
+                  <Space size="small">
+                    <Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>SAP No:</Text>
+                    {renderSapNo(viewModal.sapNo)}
+                  </Space>
+                  <Space size="small">
+                    <Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>Generated Rows:</Text>
+                    <Text strong style={{ color: '#0f172a' }}>{viewModal.rows.length}</Text>
+                  </Space>
+                </div>
 
-        <Space wrap>
-          <Button type="primary" loading={processing} onClick={handleProcess} disabled={!BACKEND_URL}>
-            Process JV DBK
-          </Button>
-          <Button
-            icon={<ReloadOutlined />}
-            onClick={() => fetchDates()}
-            loading={loadingDates}
-            disabled={!BACKEND_URL || loadingDates}
-          >
-            Refresh
-          </Button>
-        </Space>
+                {viewModal.loading ? (
+                  <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Loading detailed records...</div>
+                ) : (
+                  <div style={{ animation: 'fadeIn 0.3s' }}>
+                    <ProDataTable
+                      columns={detailColumns}
+                      fetchData={fetchModalTableData}
+                      refreshKey={modalRefreshKey}
+                      rowKey={(r, i) => String(r?.id ?? r?._id ?? r?.ASSIGNMENT ?? `jv-dbk-detail-${i}`)}
+                      globalSearchPlaceholder="Search detailed records..."
+                      showSelectionColumn={false}
+                    />
+                  </div>
+                )}
+              </Space>
+            </ConfigProvider>
+          </>
+        ) : (
+          <>
+            <PageHeader
+              title="JV DBK"
+              description="Run JV DBK process and view date-wise generated rows."
+              actions={
+                <Space>
+                  <Button icon={<ReloadOutlined />} onClick={() => fetchDates()} loading={loadingDates} disabled={!BACKEND_URL || loadingDates} style={{ borderRadius: 6 }}>
+                    Refresh
+                  </Button>
+                  <Button type="primary" loading={processing} onClick={handleProcess} disabled={!BACKEND_URL} style={{ borderRadius: 6, boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)' }}>
+                    Process JV DBK
+                  </Button>
+                </Space>
+              }
+            />
 
-        <Table
-          rowKey={(r) => String(r?.id ?? r?.dayKey ?? r?.createdAt)}
-          columns={dateTableColumns}
-          dataSource={dateRows}
-          loading={loadingDates}
-          pagination={{ pageSize: 25, showSizeChanger: true }}
-          scroll={{ x: 'max-content' }}
-          size="small"
-          locale={{ emptyText: 'No JV DBK dates found.' }}
-        />
+            <ConfigProvider
+              theme={{
+                token: { colorPrimary: '#2563eb', borderRadius: 6, colorText: '#1e293b' },
+                components: {
+                  Table: { headerBg: '#f1f5f9', headerColor: '#334155', headerBorderRadius: 8, borderColor: '#e2e8f0', rowHoverBg: '#f8fafc', cellPaddingBlock: 12 },
+                  Button: { primaryColor: '#ffffff', colorPrimary: '#2563eb', colorPrimaryHover: '#1d4ed8', colorPrimaryActive: '#1e40af' },
+                }
+              }}
+            >
+              <div style={{ animation: 'fadeIn 0.3s' }}>
+                <ProDataTable
+                  columns={dateTableColumns}
+                  fetchData={fetchMainTableData}
+                  refreshKey={tableRefreshKey}
+                  rowKey={(r) => String(r?.id ?? r?.dayKey ?? r?.createdAt ?? Math.random())}
+                  globalSearchPlaceholder="Search dates or SAP numbers..."
+                  showSelectionColumn={false}
+                />
+              </div>
+            </ConfigProvider>
+          </>
+        )}
       </Space>
+    </>
+  )
+}
 
-      <Modal
-        title={`JV DBK — ${viewModal.dayKey || '—'}`}
-        open={viewModal.open}
-        onCancel={() =>
-          setViewModal({ open: false, loading: false, exporting: false, dateId: '', dayKey: '', sapNo: '', rows: [] })
-        }
-        width="92%"
-        style={{ top: 24 }}
-        footer={[
-          <Button key="export" icon={<DownloadOutlined />} loading={viewModal.exporting} onClick={handleExportFromModal}>
-            Export Excel
-          </Button>,
-          <Button
-            key="close"
-            onClick={() =>
-              setViewModal({ open: false, loading: false, exporting: false, dateId: '', dayKey: '', sapNo: '', rows: [] })
+export default function CompanyAdminJvDbkPage() {
+  const tabItems = [
+    {
+      key: 'data',
+      label: 'DBK Data',
+      children: <JvDbkDataContent />,
+    },
+    {
+      key: 'format',
+      label: 'DBK Format',
+      children: <JvDbkFormatContent />,
+    },
+  ]
+
+  return (
+    <AppShell sidebar={<CompanySidebar />}>
+      <Space direction="vertical" size={16} style={{ width: '100%', minWidth: 0 }}>
+        <ConfigProvider
+          theme={{
+            token: { colorPrimary: '#2563eb', borderRadius: 6, colorText: '#1e293b' },
+            components: {
+              Tabs: { itemColor: '#64748b', itemSelectedColor: '#2563eb', itemHoverColor: '#3b82f6', titleFontSize: 15 },
             }
-          >
-            Close
-          </Button>,
-        ]}
-        destroyOnClose
-      >
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <Space wrap>
-            <Text type="secondary">Date:</Text>
-            <Text strong>{viewModal.dayKey || '—'}</Text>
-            <Text type="secondary">SAP No:</Text>
-            {renderSapNo(viewModal.sapNo)}
-            <Text type="secondary">Rows:</Text>
-            <Text strong>{viewModal.rows.length}</Text>
-          </Space>
-          <Table
-            rowKey={(r, i) => String(r?.id ?? r?._id ?? r?.ASSIGNMENT ?? `jv-dbk-detail-${i}`)}
-            columns={detailColumns}
-            dataSource={viewModal.rows}
-            loading={viewModal.loading}
-            pagination={{ pageSize: 25, showSizeChanger: true }}
-            scroll={{ x: 'max-content' }}
-            size="small"
-            locale={{ emptyText: viewModal.loading ? 'Loading…' : 'No rows found for this date.' }}
-          />
-        </Space>
-      </Modal>
+          }}
+        >
+          <Tabs defaultActiveKey="data" items={tabItems} style={{ marginTop: -16 }} />
+        </ConfigProvider>
+      </Space>
     </AppShell>
   )
 }

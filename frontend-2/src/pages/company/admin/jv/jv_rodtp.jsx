@@ -1,11 +1,12 @@
 import { DownloadOutlined, EyeOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, Modal, Space, Table, Tag, Typography, message, ConfigProvider, Card } from 'antd'
+import { Button, Modal, Space, Table, Tag, Typography, message, ConfigProvider, Card, Tabs } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
 import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
+import { JvRodtpFormatContent } from './jv_rodtp_format.jsx'
 
 const { Title, Text } = Typography
 
@@ -186,7 +187,7 @@ function getColumnsFromRows(rows) {
   ]
 }
 
-export default function CompanyAdminJvRodtpPage() {
+export function JvRodtpDataContent() {
   const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '')
 
   const [processing, setProcessing] = useState(false)
@@ -442,8 +443,8 @@ export default function CompanyAdminJvRodtpPage() {
   )
 
   return (
-    <AppShell sidebar={<CompanySidebar />}>
-      <Space direction="vertical" size={16} style={{ width: '100%', minWidth: 0 }}>
+    <>
+      <Space direction="vertical" size={16} style={{ width: '100%', minWidth: 0, marginTop: -8 }}>
         {view === 'form' ? (
           <>
             <PageHeader
@@ -541,6 +542,38 @@ export default function CompanyAdminJvRodtpPage() {
             </ConfigProvider>
           </>
         )}
+      </Space>
+    </>
+  )
+}
+
+export default function CompanyAdminJvRodtpPage() {
+  const tabItems = [
+    {
+      key: 'data',
+      label: 'RoDTEP Data',
+      children: <JvRodtpDataContent />,
+    },
+    {
+      key: 'format',
+      label: 'RoDTEP Format',
+      children: <JvRodtpFormatContent />,
+    },
+  ]
+
+  return (
+    <AppShell sidebar={<CompanySidebar />}>
+      <Space direction="vertical" size={16} style={{ width: '100%', minWidth: 0 }}>
+        <ConfigProvider
+          theme={{
+            token: { colorPrimary: '#2563eb', borderRadius: 6, colorText: '#1e293b' },
+            components: {
+              Tabs: { itemColor: '#64748b', itemSelectedColor: '#2563eb', itemHoverColor: '#3b82f6', titleFontSize: 15 },
+            }
+          }}
+        >
+          <Tabs defaultActiveKey="data" items={tabItems} style={{ marginTop: -16 }} />
+        </ConfigProvider>
       </Space>
     </AppShell>
   )
