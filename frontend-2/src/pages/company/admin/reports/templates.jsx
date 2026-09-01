@@ -1,12 +1,12 @@
-import { ArrowLeftOutlined, HolderOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons'
-import { Button, Input, InputNumber, Layout, Modal, Select, Space, Table, Typography, message } from 'antd'
+import { ArrowLeftOutlined, HolderOutlined, PlusOutlined, SaveOutlined, ArrowUpOutlined, ArrowDownOutlined, DeleteOutlined, InfoCircleOutlined, EditOutlined } from '@ant-design/icons'
+import { Button, Input, InputNumber, Select, Space, Table, Typography, message, Tag, Alert, ConfigProvider, Tooltip } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
+import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
 
-const { Content } = Layout
 const { Title, Text } = Typography
 
 function normalizeColumnsPayload(payload) {
@@ -157,11 +157,12 @@ export default function CompanyAdminReportTemplatesPage() {
   const [loadingColumns, setLoadingColumns] = useState(false)
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [columnsByType, setColumnsByType] = useState({})
-  const [modalOpen, setModalOpen] = useState(false)
+  
+  const [isEditing, setIsEditing] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [selectedRows, setSelectedRows] = useState([newSelectedHeaderRow()])
-  const [templates, setTemplates] = useState([])
-  const [loadingTemplates, setLoadingTemplates] = useState(false)
+  
+  const [refreshKey, setRefreshKey] = useState(0)
   const [loadingTemplateDetails, setLoadingTemplateDetails] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState(undefined)
   const [moveToDraft, setMoveToDraft] = useState({})
@@ -193,9 +194,8 @@ export default function CompanyAdminReportTemplatesPage() {
     fetchColumns()
   }, [fetchColumns])
 
-  const fetchTemplates = useCallback(async () => {
-    if (!BACKEND_URL) return
-    setLoadingTemplates(true)
+  const fetchTemplatesData = useCallback(async (params) => {
+    if (!BACKEND_URL) return { data: [], total: 0 }
     try {
       const res = await fetch(`${BACKEND_URL}/api/company/admin/report/templates`, {
         method: 'POST',
@@ -206,17 +206,15 @@ export default function CompanyAdminReportTemplatesPage() {
         throw new Error(data?.detail || data?.message || `Failed to load templates (${res.status})`)
       }
       const rows = normalizeTemplatesListPayload(data).filter((x) => x && typeof x === 'object')
-      setTemplates(rows)
+      return {
+        data: rows,
+        total: rows.length,
+      }
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Failed to load templates')
-    } finally {
-      setLoadingTemplates(false)
+      return { data: [], total: 0 }
     }
   }, [BACKEND_URL])
-
-  useEffect(() => {
-    fetchTemplates()
-  }, [fetchTemplates])
 
   const typeOptions = useMemo(
     () =>
@@ -307,12 +305,12 @@ export default function CompanyAdminReportTemplatesPage() {
     [moveToDraft],
   )
 
-  const resetModal = useCallback(() => {
+  const resetForm = useCallback(() => {
     setTemplateName('')
-    setSelectedRows([newSelectedHeaderRow()])
     setSelectedTemplateId(undefined)
+    setSelectedRows([newSelectedHeaderRow()])
     setMoveToDraft({})
-    setModalOpen(false)
+    setIsEditing(false)
   }, [])
 
   const mappingPayload = useMemo(() => buildMappingPayload(selectedRows), [selectedRows])
@@ -344,13 +342,14 @@ export default function CompanyAdminReportTemplatesPage() {
         throw new Error(data?.detail || data?.message || `Failed to create template (${res.status})`)
       }
       message.success(data?.message || 'Template created successfully.')
-      resetModal()
+      setRefreshKey(prev => prev + 1)
+      resetForm()
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Failed to create template')
     } finally {
       setSavingTemplate(false)
     }
-  }, [BACKEND_URL, mappingPayload, resetModal, templateName])
+  }, [BACKEND_URL, mappingPayload, resetForm, templateName])
 
   const fetchTemplateById = useCallback(
     async (id) => {
@@ -371,7 +370,7 @@ export default function CompanyAdminReportTemplatesPage() {
         setSelectedTemplateId(String(template.id || id))
         setTemplateName(String(template.templateName || ''))
         setSelectedRows(mappingToRows(template.mapping, template.mappingItems))
-        setModalOpen(true)
+        setIsEditing(true)
       } catch (e) {
         message.error(e instanceof Error ? e.message : 'Failed to load template details')
       } finally {
@@ -415,14 +414,14 @@ export default function CompanyAdminReportTemplatesPage() {
         throw new Error(data?.detail || data?.message || `Failed to update template (${res.status})`)
       }
       message.success(data?.message || 'Template updated successfully.')
-      await fetchTemplates()
-      resetModal()
+      setRefreshKey(prev => prev + 1)
+      resetForm()
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Failed to update template')
     } finally {
       setSavingTemplate(false)
     }
-  }, [BACKEND_URL, fetchTemplates, mappingPayload, resetModal, selectedTemplateId, templateName])
+  }, [BACKEND_URL, mappingPayload, resetForm, selectedTemplateId, templateName])
 
   const columns = useMemo(
     () => [
@@ -555,7 +554,7 @@ export default function CompanyAdminReportTemplatesPage() {
       {
         title: 'Move to #',
         key: 'moveTo',
-        width: 168,
+        width: 150,
         render: (_, row, index) => (
           <Space size={4} wrap={false}>
             <InputNumber
@@ -570,9 +569,9 @@ export default function CompanyAdminReportTemplatesPage() {
                 }))
               }
               onPressEnter={() => applyMoveToPosition(row.key, index)}
-              style={{ width: 72 }}
+              style={{ width: 64 }}
             />
-            <Button size="small" type="primary" ghost onClick={() => applyMoveToPosition(row.key, index)}>
+            <Button size="small" type="default" onClick={() => applyMoveToPosition(row.key, index)} style={{ color: 'var(--exim-primary)', borderColor: 'var(--exim-primary-100)', background: 'var(--exim-primary-50)' }}>
               Go
             </Button>
           </Space>
@@ -581,30 +580,21 @@ export default function CompanyAdminReportTemplatesPage() {
       {
         title: 'Order',
         key: 'order',
-        width: 120,
+        width: 80,
         render: (_, row, index) => (
-          <Space size="small">
-            <Button type="text" disabled={index === 0} onClick={() => moveRow(row.key, 'up')}>
-              Up
-            </Button>
-            <Button
-              type="text"
-              disabled={index === selectedRows.length - 1}
-              onClick={() => moveRow(row.key, 'down')}
-            >
-              Down
-            </Button>
+          <Space size="small" wrap={false}>
+            <Button type="text" size="small" icon={<ArrowUpOutlined style={{ fontSize: 12 }} />} disabled={index === 0} onClick={() => moveRow(row.key, 'up')} style={{ color: 'var(--exim-gray-500)' }} />
+            <Button type="text" size="small" icon={<ArrowDownOutlined style={{ fontSize: 12 }} />} disabled={index === selectedRows.length - 1} onClick={() => moveRow(row.key, 'down')} style={{ color: 'var(--exim-gray-500)' }} />
           </Space>
         ),
       },
       {
         title: 'Action',
         key: 'action',
-        width: 100,
+        width: 64,
+        align: 'center',
         render: (_, row) => (
-          <Button danger type="link" onClick={() => removeRow(row.key)}>
-            Remove
-          </Button>
+          <Button danger type="text" size="small" icon={<DeleteOutlined />} onClick={() => removeRow(row.key)} />
         ),
       },
     ],
@@ -623,118 +613,225 @@ export default function CompanyAdminReportTemplatesPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <Space style={{ justifyContent: 'space-between', width: '100%' }} wrap>
-              <div>
-                <Title level={3} style={{ margin: 0 }}>
-                  Report Templates
-                </Title>
-                <Text type="secondary">Select report headers and rename them before creating templates.</Text>
-              </div>
-              <Space>
-                <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/admin/reports')}>
-                  Back to Reports
-                </Button>
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => setModalOpen(true)} loading={loadingColumns}>
-                  Create Templates
-                </Button>
-              </Space>
+      <PageHeader
+        title={isEditing ? (selectedTemplateId ? 'Update Template' : 'Create Template') : 'Report Templates'}
+        description={isEditing 
+          ? "Build your report template by mapping standard headers to your custom formats."
+          : "Select report headers and rename them before creating custom report templates."}
+        actions={
+          !isEditing && (
+            <Space>
+              <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/admin/reports')}>
+                Back to Reports
+              </Button>
             </Space>
+          )
+        }
+      />
 
-            <Text type="secondary">
-              Available types: {reportTypes.length ? reportTypes.map((t) => t.toUpperCase()).join(', ') : 'No type found'}
-            </Text>
-
-            <Table
-              size="small"
-              rowKey={(row, index) => String(row.id || row._id || `${row.templateName || 'template'}-${index}`)}
-              loading={loadingTemplates || loadingTemplateDetails}
-              pagination={{ pageSize: 10, showSizeChanger: true }}
-              dataSource={templates}
-              columns={[
-                {
-                  title: 'Template Name',
-                  dataIndex: 'templateName',
-                  key: 'templateName',
-                  render: (value) => String(value || '-'),
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        {!isEditing ? (
+          <ProDataTable
+            fetchData={fetchTemplatesData}
+            refreshKey={refreshKey}
+            globalSearchPlaceholder="Search templates by name..."
+            rowKey={(row) => String(row.id || row._id || '')}
+            showSelectionColumn={false}
+            customToolbarActions={
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsEditing(true)} loading={loadingColumns}>
+                Create Template
+              </Button>
+            }
+            columns={[
+              {
+                title: 'Template Name',
+                dataIndex: 'templateName',
+                key: 'templateName',
+                render: (value) => <Text strong>{String(value || '-')}</Text>,
+              },
+              {
+                title: 'ID',
+                dataIndex: 'id',
+                key: 'id',
+                render: (_, row) => (
+                  <Text code style={{ fontSize: 11 }}>{String(row.id || row._id || '-')}</Text>
+                ),
+              },
+              {
+                title: 'Created',
+                dataIndex: 'createdAt',
+                key: 'createdAt',
+                render: (value) => {
+                  if (!value) return '-'
+                  const d = new Date(value)
+                  const formatted = isNaN(d.getTime()) ? String(value) : d.toLocaleString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                  return <Text type="secondary" style={{ whiteSpace: 'nowrap', fontSize: 13 }}>{formatted}</Text>
                 },
-                {
-                  title: 'ID',
-                  dataIndex: 'id',
-                  key: 'id',
-                  render: (_, row) => String(row.id || row._id || '-'),
+              },
+              {
+                title: 'Updated',
+                dataIndex: 'updatedAt',
+                key: 'updatedAt',
+                render: (value) => {
+                  if (!value) return '-'
+                  const d = new Date(value)
+                  const formatted = isNaN(d.getTime()) ? String(value) : d.toLocaleString('en-US', { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                  return <Text type="secondary" style={{ whiteSpace: 'nowrap', fontSize: 13 }}>{formatted}</Text>
                 },
-                {
-                  title: 'Created',
-                  dataIndex: 'createdAt',
-                  key: 'createdAt',
-                  render: (value) => String(value || '-'),
-                },
-                {
-                  title: 'Updated',
-                  dataIndex: 'updatedAt',
-                  key: 'updatedAt',
-                  render: (value) => String(value || '-'),
-                },
-                {
-                  title: 'Action',
-                  key: 'action',
-                  width: 120,
-                  render: (_, row) => (
-                    <Button
-                      type="link"
-                      onClick={() => fetchTemplateById(String(row.id || row._id || ''))}
-                      disabled={!row.id && !row._id}
-                    >
-                      Edit
-                    </Button>
-                  ),
-                },
-              ]}
-            />
-          </Space>
-        
-
-      <Modal
-        title={selectedTemplateId ? 'Update Template' : 'Create Template'}
-        open={modalOpen}
-        width="92vw"
-        style={{ top: 24, maxWidth: 1400 }}
-        styles={{ body: { maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' } }}
-        onCancel={resetModal}
-        onOk={selectedTemplateId ? handleUpdateTemplate : handleSaveTemplate}
-        okText={selectedTemplateId ? 'Update Template' : 'Save Template'}
-        okButtonProps={{ icon: <SaveOutlined />, loading: savingTemplate }}
-      >
-        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-          <div>
-            <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-              Template name (optional)
-            </Text>
-            <Input value={templateName} onChange={(e) => setTemplateName(e.target.value)} placeholder="Example: Monthly Export Template" />
-          </div>
-
-          <Text type="secondary" style={{ display: 'block' }}>
-            Drag the <HolderOutlined /> handle, use <b>Move to #</b> + Go (inserts at that position — other rows
-            shift; rows are not swapped), or use Up / Down. <b>Data Type</b> sets the Excel cell type: Date →
-            date cell (DD/MM/YYYY), Number → numeric cell, Decimal → numeric cell (0.00).
-          </Text>
-
-          <Table
-            size="small"
-            rowKey="key"
-            columns={columns}
-            dataSource={selectedRows}
-            pagination={false}
-            scroll={{ x: 1280 }}
-            onRow={getTableRowProps}
+              },
+              {
+                title: 'Action',
+                key: 'action',
+                align: 'center',
+                render: (_, row) => (
+                  <Button
+                    type="text"
+                    icon={<EditOutlined />}
+                    onClick={() => fetchTemplateById(String(row.id || row._id || ''))}
+                    disabled={!row.id && !row._id}
+                    style={{ color: '#2563eb' }}
+                  />
+                ),
+              },
+              {
+                title: '',
+                key: 'filler',
+              },
+            ]}
           />
+        ) : (
+          <ConfigProvider
+            theme={{
+              token: {
+                colorPrimary: '#2563eb',
+                borderRadius: 6,
+                colorText: '#1e293b',
+              },
+              components: {
+                Input: {
+                  colorBgContainer: '#f8fafc',
+                  colorBorder: '#cbd5e1',
+                  hoverBorderColor: '#94a3b8',
+                  activeBorderColor: '#2563eb',
+                  activeShadow: '0 0 0 2px rgba(37, 99, 235, 0.1)',
+                },
+                Select: {
+                  colorBgContainer: '#f8fafc',
+                  colorBorder: '#cbd5e1',
+                  hoverBorderColor: '#94a3b8',
+                  activeBorderColor: '#2563eb',
+                  activeShadow: '0 0 0 2px rgba(37, 99, 235, 0.1)',
+                },
+                Table: {
+                  headerBg: '#f1f5f9',
+                  headerColor: '#334155',
+                  headerBorderRadius: 8,
+                  borderColor: '#e2e8f0',
+                  rowHoverBg: '#f8fafc',
+                  cellPaddingBlock: 12,
+                },
+                Button: {
+                  primaryColor: '#ffffff',
+                  colorPrimary: '#2563eb',
+                  colorPrimaryHover: '#1d4ed8',
+                  colorPrimaryActive: '#1e40af',
+                }
+              }
+            }}
+          >
+            <div style={{
+              background: '#ffffff',
+              borderRadius: 12,
+              padding: 24,
+              boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01)',
+              border: '1px solid #e2e8f0',
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+                
+                <div style={{ maxWidth: 640 }}>
+                  <Text style={{ display: 'block', marginBottom: 8, fontSize: 13, fontWeight: 600, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Template Name
+                  </Text>
+                  <Input
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    placeholder="e.g. Monthly Export Template"
+                    size="large"
+                    style={{ borderRadius: 8, fontSize: 15 }}
+                  />
+                </div>
 
-          <div>
-            <Button onClick={addRow}>+ Add Header Row</Button>
-          </div>
-        </Space>
-      </Modal>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 12 }}>
+                    <div>
+                      <Space align="center" size="small">
+                        <Typography.Title level={5} style={{ margin: 0, color: '#0f172a', fontWeight: 600, fontSize: 18 }}>
+                          Template Columns
+                        </Typography.Title>
+                        <Tooltip title="Drag the handle, use Move to # + Go, or Up/Down to reorder. Data Type sets the Excel cell format." placement="right">
+                          <Button type="text" shape="circle" size="small" icon={<InfoCircleOutlined style={{ color: '#94a3b8' }} />} style={{ marginTop: 2 }} />
+                        </Tooltip>
+                      </Space>
+                      <div style={{ marginTop: 2 }}>
+                        <Text type="secondary" style={{ fontSize: 13, color: '#64748b' }}>Configure the exact output format for your Excel report.</Text>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: 8, overflow: 'hidden', boxShadow: '0 1px 2px rgba(0, 0, 0, 0.02)' }}>
+                    <Table
+                      size="middle"
+                      rowKey="key"
+                      columns={columns}
+                      dataSource={selectedRows}
+                      pagination={false}
+                      scroll={{ x: 'max-content' }}
+                      onRow={getTableRowProps}
+                      locale={{ emptyText: 'No columns added yet' }}
+                      className="enterprise-table custom-scrollbar"
+                    />
+                  </div>
+                  
+                  <Button
+                    type="dashed"
+                    onClick={addRow}
+                    icon={<PlusOutlined />}
+                    style={{
+                      width: '100%',
+                      marginTop: 12,
+                      height: 40,
+                      borderRadius: 8,
+                      color: '#64748b',
+                      borderColor: '#cbd5e1',
+                      fontWeight: 500,
+                    }}
+                  >
+                    Add Header Row
+                  </Button>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+                  <Space size="middle">
+                    <Button onClick={resetForm} size="large" style={{ borderRadius: 8, fontWeight: 500 }}>
+                      Cancel
+                    </Button>
+                    <Button
+                      type="primary"
+                      size="large"
+                      loading={savingTemplate}
+                      onClick={selectedTemplateId ? handleUpdateTemplate : handleSaveTemplate}
+                      style={{ borderRadius: 8, fontWeight: 500, boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)' }}
+                    >
+                      {selectedTemplateId ? 'Update Template' : 'Save Template'}
+                    </Button>
+                  </Space>
+                </div>
+
+              </div>
+            </div>
+          </ConfigProvider>
+        )}
+      </Space>
     </AppShell>
   )
 }
