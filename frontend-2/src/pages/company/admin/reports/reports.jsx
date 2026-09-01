@@ -1,11 +1,12 @@
-import { DownloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { Button, DatePicker, Dropdown, Layout, Select, Space, Table, Tag, Typography, message } from 'antd'
+import { DownloadOutlined, SearchOutlined, DatabaseOutlined, LayoutOutlined, CalendarOutlined, ControlOutlined } from '@ant-design/icons'
+import { Button, DatePicker, Dropdown, Layout, Select, Space, Table, Tag, Typography, message, ConfigProvider, Card, Form, Row, Col, Empty, Divider } from 'antd'
 import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
+import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -325,6 +326,28 @@ export default function CompanyAdminReportsPage() {
   const [loadingExcel, setLoadingExcel] = useState(false)
   const [reportPayload, setReportPayload] = useState(null)
   const [reportRows, setReportRows] = useState([])
+  const [tableRefreshKey, setTableRefreshKey] = useState(0)
+
+  useEffect(() => {
+    setTableRefreshKey((prev) => prev + 1)
+  }, [reportRows])
+
+  const fetchReportDataForTable = useCallback(async ({ page, limit, search }) => {
+    let filtered = reportRows
+    if (search) {
+      const lowerSearch = search.toLowerCase()
+      filtered = filtered.filter((row) =>
+        Object.values(row).some((val) => String(val).toLowerCase().includes(lowerSearch))
+      )
+    }
+    const total = filtered.length
+    const start = (page - 1) * limit
+    const paginated = filtered.slice(start, start + limit)
+    return {
+      data: paginated,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    }
+  }, [reportRows])
 
   const fetchColumnsConfig = useCallback(async () => {
     if (!BACKEND_URL) return
@@ -660,126 +683,148 @@ export default function CompanyAdminReportsPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="large" style={{ width: '100%', minWidth: 0 }}>
-            <div>
-              <Title level={3} style={{ margin: 0 }}>
-                Reports
-              </Title>
-              <Space>
-                <Text type="secondary">Load JSON from the server or download the same filter as an Excel file.</Text>
-                <Button size="small" onClick={() => navigate('/admin/reports/templates')}>
-                  Create Templates
-                </Button>
-              </Space>
-            </div>
+      <Space direction="vertical" size={16} style={{ width: '100%', minWidth: 0 }}>
+        
+        <PageHeader
+          title="Reports"
+          description="Build cross-module reports, apply templates, and extract data directly to Excel."
+          actions={
+            <Button type="default" onClick={() => navigate('/admin/reports/templates')} style={{ borderRadius: 6 }}>
+              Manage Templates
+            </Button>
+          }
+        />
 
-            <Space wrap align="start" size="middle">
-              <div>
-                <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-                  Report type
-                </Text>
-                <Select
-                  mode="multiple"
-                  allowClear
-                  placeholder="Select type"
-                  style={{ minWidth: 220 }}
-                  options={reportTypeOptions}
-                  value={reportTypes}
-                  onChange={setReportTypes}
-                  loading={loadingColumns}
-                />
-              </div>
-              <div>
-                <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-                  Template
-                </Text>
-                <Select
-                  allowClear
-                  placeholder="Choose template"
-                  style={{ minWidth: 240 }}
-                  loading={loadingTemplates || loadingTemplateDetails}
-                  value={selectedTemplateId}
-                  options={templates.map((t) => ({
-                    value: String(t.id || t._id || ''),
-                    label: String(t.templateName || t.name || t.id || t._id || ''),
-                  })).filter((opt) => opt.value)}
-                  onChange={handleTemplateChange}
-                />
-              </div>
-              <div>
-                <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-                  Columns
-                </Text>
-                <Space wrap>
-                  <Dropdown
-                    trigger={['click']}
-                    disabled={Boolean(selectedTemplateId)}
-                    menu={{
-                      items: columnMenuItems,
-                      selectable: true,
-                      multiple: true,
-                      selectedKeys: selectedColumns,
-                      onSelect: ({ key }) => setSelectedColumns((prev) => (prev.includes(key) ? prev : [...prev, key])),
-                      onDeselect: ({ key }) => setSelectedColumns((prev) => prev.filter((k) => k !== key)),
-                    }}
+        <ConfigProvider
+          theme={{
+            token: { colorPrimary: '#2563eb', borderRadius: 6, colorText: '#1e293b' },
+            components: {
+              Input: { colorBgContainer: '#f8fafc', colorBorder: '#cbd5e1', hoverBorderColor: '#94a3b8', activeBorderColor: '#2563eb' },
+              Select: { colorBgContainer: '#f8fafc', colorBorder: '#cbd5e1', hoverBorderColor: '#94a3b8', activeBorderColor: '#2563eb' },
+              DatePicker: { colorBgContainer: '#f8fafc', colorBorder: '#cbd5e1', hoverBorderColor: '#94a3b8', activeBorderColor: '#2563eb' },
+              Table: { headerBg: '#f1f5f9', headerColor: '#334155', headerBorderRadius: 8, borderColor: '#e2e8f0', rowHoverBg: '#f8fafc', cellPaddingBlock: 12 },
+              Button: { primaryColor: '#ffffff', colorPrimary: '#2563eb', colorPrimaryHover: '#1d4ed8', colorPrimaryActive: '#1e40af' }
+            }
+          }}
+        >
+          <Card 
+            bordered={false} 
+            style={{ borderRadius: 12, boxShadow: '0 4px 20px -4px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.02)' }}
+            bodyStyle={{ padding: 16 }}
+          >
+            <Form layout="vertical">
+              <Row gutter={24}>
+                <Col xs={24} sm={12} md={8} lg={6}>
+                  <Form.Item 
+                    label={<Text style={{ fontSize: 12, fontWeight: 600, color: '#475569', letterSpacing: '0.5px' }}><DatabaseOutlined style={{ marginRight: 6 }} />REPORT DATA SOURCES</Text>}
+                    style={{ marginBottom: 12 }}
                   >
-                    <Button
-                      loading={loadingColumns || loadingTemplateDetails}
-                      disabled={Boolean(selectedTemplateId) || !activeColumnOptions.length}
-                    >
-                      {selectedColumns.length ? `Columns selected (${selectedColumns.length})` : 'Choose columns'}
-                    </Button>
-                  </Dropdown>
-                  <Button onClick={() => setSelectedColumns([])} disabled={Boolean(selectedTemplateId) || !selectedColumns.length}>
-                    Clear columns
-                  </Button>
-                </Space>
-              </div>
-              <div>
-                <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-                  From — To (optional)
-                </Text>
-                <DatePicker.RangePicker
-                  value={dateRange}
-                  onChange={(v) => setDateRange(v)}
-                  format="YYYY-MM-DD"
-                  allowClear
-                />
-              </div>
-              <div style={{ alignSelf: 'flex-end' }}>
-                <Space>
-                  <Button type="primary" icon={<SearchOutlined />} loading={loadingData} onClick={handleLoadData}>
-                    Load data
-                  </Button>
-                  <Button icon={<DownloadOutlined />} loading={loadingExcel} onClick={handleDownloadExcel}>
-                    Download Excel
-                  </Button>
-                </Space>
-              </div>
-            </Space>
+                    <Select
+                      mode="multiple"
+                      allowClear
+                      placeholder="Select modules"
+                      style={{ width: '100%' }}
+                      options={reportTypeOptions}
+                      value={reportTypes}
+                      onChange={setReportTypes}
+                      loading={loadingColumns}
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} sm={12} md={8} lg={8}>
+                  <Form.Item 
+                    label={<Text style={{ fontSize: 12, fontWeight: 600, color: '#475569', letterSpacing: '0.5px' }}><LayoutOutlined style={{ marginRight: 6 }} />CONFIGURATION TEMPLATE</Text>}
+                    style={{ marginBottom: 12 }}
+                  >
+                    <Select
+                      allowClear
+                      placeholder="Choose an existing template"
+                      style={{ width: '100%' }}
+                      loading={loadingTemplates || loadingTemplateDetails}
+                      value={selectedTemplateId}
+                      options={templates.map((t) => ({
+                        value: String(t.id || t._id || ''),
+                        label: String(t.templateName || t.name || t.id || t._id || ''),
+                      })).filter((opt) => opt.value)}
+                      onChange={handleTemplateChange}
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} sm={12} md={8} lg={6}>
+                  <Form.Item 
+                    label={<Text style={{ fontSize: 12, fontWeight: 600, color: '#475569', letterSpacing: '0.5px' }}><CalendarOutlined style={{ marginRight: 6 }} />DATE RANGE</Text>}
+                    style={{ marginBottom: 12 }}
+                  >
+                    <DatePicker.RangePicker
+                      value={dateRange}
+                      onChange={(v) => setDateRange(v)}
+                      format="YYYY-MM-DD"
+                      allowClear
+                      style={{ width: '100%' }}
+                    />
+                  </Form.Item>
+                </Col>
+
+                <Col xs={24} sm={12} md={24} lg={4}>
+                  <Form.Item 
+                    label={<Text style={{ fontSize: 12, fontWeight: 600, color: '#475569', letterSpacing: '0.5px' }}><ControlOutlined style={{ marginRight: 6 }} />CUSTOM COLUMNS</Text>}
+                    style={{ marginBottom: 12 }}
+                  >
+                    <Space.Compact style={{ width: '100%' }}>
+                      <Dropdown
+                        trigger={['click']}
+                        disabled={Boolean(selectedTemplateId)}
+                        menu={{
+                          items: columnMenuItems,
+                          selectable: true,
+                          multiple: true,
+                          selectedKeys: selectedColumns,
+                          onSelect: ({ key }) => setSelectedColumns((prev) => (prev.includes(key) ? prev : [...prev, key])),
+                          onDeselect: ({ key }) => setSelectedColumns((prev) => prev.filter((k) => k !== key)),
+                        }}
+                      >
+                        <Button
+                          loading={loadingColumns || loadingTemplateDetails}
+                          disabled={Boolean(selectedTemplateId) || !activeColumnOptions.length}
+                          style={{ width: '70%' }}
+                        >
+                          {selectedColumns.length ? `${selectedColumns.length} Selected` : 'Choose'}
+                        </Button>
+                      </Dropdown>
+                      <Button onClick={() => setSelectedColumns([])} disabled={Boolean(selectedTemplateId) || !selectedColumns.length} style={{ width: '30%' }}>
+                        Clear
+                      </Button>
+                    </Space.Compact>
+                  </Form.Item>
+                </Col>
+              </Row>
+            </Form>
 
             {selectedTemplateSummary ? (
-              <Space wrap size="middle">
-                <Text type="secondary">Selected template:</Text>
-                <Tag color="blue">{selectedTemplateSummary.name}</Tag>
-                <Text type="secondary">ID: {selectedTemplateSummary.id}</Text>
-              </Space>
+              <div style={{ padding: '8px 12px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0', display: 'inline-block', marginBottom: 12 }}>
+                <Space size="small">
+                  <Text type="secondary" style={{ fontSize: 12, fontWeight: 500 }}>Active Template:</Text>
+                  <Tag color="blue" style={{ margin: 0, fontSize: 12 }}>{selectedTemplateSummary.name}</Tag>
+                </Space>
+              </div>
             ) : null}
 
-            {selectedColumns.length ? (
-              <div>
-                <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-                  Selected columns (grouped by type)
+            {selectedColumns.length && !selectedTemplateId ? (
+              <div style={{ padding: '12px', background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0', marginBottom: 12 }}>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 8, fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>
+                  Active Column Mappings
                 </Text>
-                <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                <Space direction="vertical" size={6} style={{ width: '100%' }}>
                   {Object.entries(selectedColumnsGrouped).map(([type, cols]) => (
-                    <div key={type}>
-                      <Text strong style={{ marginRight: 8 }}>
+                    <div key={type} style={{ display: 'flex', alignItems: 'flex-start' }}>
+                      <Text style={{ width: 80, fontSize: 11, color: '#64748b', marginTop: 4, fontWeight: 600 }}>
                         {(REPORT_TYPE_OPTIONS.find((o) => o.value === type)?.label || type).toUpperCase()}:
                       </Text>
-                      <Space size={[6, 6]} wrap>
+                      <Space size={[4, 4]} wrap style={{ flex: 1 }}>
                         {cols.map((col) => (
-                          <Tag key={`${type}-${col}`}>{col}</Tag>
+                          <Tag key={`${type}-${col}`} style={{ color: '#334155', border: '1px solid #cbd5e1', background: '#ffffff', fontSize: 11 }}>{col}</Tag>
                         ))}
                       </Space>
                     </div>
@@ -788,35 +833,49 @@ export default function CompanyAdminReportsPage() {
               </div>
             ) : null}
 
-            {reportPayload && typeof reportPayload === 'object' && reportPayload.data && typeof reportPayload.data === 'object' ? (
-              <Space wrap size="middle">
-                {reportPayload.message ? <Text type="secondary">{String(reportPayload.message)}</Text> : null}
-                <Text>
-                  <Text strong>{reportPayload.data.count ?? reportRows.length}</Text> row
-                  {(reportPayload.data.count ?? reportRows.length) === 1 ? '' : 's'}
-                </Text>
-                {reportPayload.data.rowstype != null ? (
-                  <Text type="secondary">Types: {String(reportPayload.data.rowstype)}</Text>
-                ) : null}
-                {reportPayload.data.fromDate != null && reportPayload.data.toDate != null ? (
-                  <Text type="secondary">
-                    {String(reportPayload.data.fromDate)} → {String(reportPayload.data.toDate)}
-                  </Text>
-                ) : null}
-              </Space>
-            ) : null}
+            <Divider style={{ margin: '8px 0 16px 0' }} />
 
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                Configure the parameters above and load the data grid before exporting.
+              </Text>
+              <Space size="middle">
+                <Button icon={<DownloadOutlined />} loading={loadingExcel} onClick={handleDownloadExcel} style={{ borderRadius: 6, fontWeight: 500 }}>
+                  Export to Excel
+                </Button>
+                <Button type="primary" icon={<SearchOutlined />} loading={loadingData} onClick={handleLoadData} style={{ borderRadius: 6, fontWeight: 500, boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)' }}>
+                  Load Data Grid
+                </Button>
+              </Space>
+            </div>
+          </Card>
+
+          <div style={{ display: 'flex', flexDirection: 'column', minHeight: 400, marginTop: 16 }}>
             {reportRows.length > 0 ? (
-              <div style={{ width: '100%', minWidth: 0, overflowX: 'auto' }}>
-                <Table
-                  size="small"
-                  style={{ width: '100%', minWidth: 0 }}
-                  tableLayout="auto"
-                  rowKey={(r, i) => String(r?.pm_id ?? r?.sales_rowId ?? r?.pdf_pdfRowId ?? `row-${i}`)}
+              <div style={{ animation: 'fadeIn 0.3s' }}>
+                <ProDataTable
                   columns={columns}
-                  dataSource={reportRows}
-                  pagination={{ pageSize: 25, showSizeChanger: true }}
-                  scroll={{ x: tableScrollX }}
+                  fetchData={fetchReportDataForTable}
+                  refreshKey={tableRefreshKey}
+                  rowKey={(r) => String(r?.pm_id ?? r?.sales_rowId ?? r?.pdf_pdfRowId ?? Math.random())}
+                  globalSearchPlaceholder="Search report data..."
+                  showSelectionColumn={false}
+                  customToolbarActions={
+                    reportPayload && typeof reportPayload === 'object' && reportPayload.data && typeof reportPayload.data === 'object' ? (
+                      <Space size="middle">
+                        {reportPayload.data.rowstype != null && (
+                          <Text style={{ fontSize: 12, color: '#64748b' }}>
+                            <span style={{ fontWeight: 600 }}>Sources:</span> {String(reportPayload.data.rowstype).toUpperCase()}
+                          </Text>
+                        )}
+                        {reportPayload.data.fromDate != null && reportPayload.data.toDate != null && (
+                          <Text style={{ fontSize: 12, color: '#64748b' }}>
+                            <span style={{ fontWeight: 600 }}>Period:</span> {String(reportPayload.data.fromDate)} → {String(reportPayload.data.toDate)}
+                          </Text>
+                        )}
+                      </Space>
+                    ) : null
+                  }
                 />
               </div>
             ) : reportPayload != null ? (
@@ -824,20 +883,35 @@ export default function CompanyAdminReportsPage() {
                 style={{
                   margin: 0,
                   padding: 16,
-                  background: '#fafafa',
-                  border: '1px solid #f0f0f0',
-                  borderRadius: 8,
+                  background: '#ffffff',
+                  borderRadius: 12,
+                  boxShadow: '0 4px 20px -4px rgba(0,0,0,0.05)',
+                  border: '1px solid #f1f5f9',
                   overflow: 'auto',
                   maxHeight: 480,
                   fontSize: 12,
+                  color: '#475569',
+                  animation: 'fadeIn 0.3s'
                 }}
               >
                 {JSON.stringify(reportPayload, null, 2)}
               </pre>
             ) : (
-              <Text type="secondary">Run &quot;Load data&quot; to preview the JSON response here.</Text>
+              <Card bordered={false} style={{ borderRadius: 12, background: '#ffffff', border: '1px dashed #cbd5e1', boxShadow: '0 4px 20px -4px rgba(0,0,0,0.02)' }} bodyStyle={{ padding: '80px 24px', textAlign: 'center' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 72, height: 72, borderRadius: '50%', background: '#eff6ff', marginBottom: 24 }}>
+                  <DatabaseOutlined style={{ fontSize: 32, color: '#3b82f6' }} />
+                </div>
+                <Typography.Title level={4} style={{ margin: 0, color: '#0f172a', fontWeight: 600, letterSpacing: '-0.01em' }}>
+                  Ready to Extract Data
+                </Typography.Title>
+                <Typography.Text style={{ display: 'block', marginTop: 12, color: '#64748b', fontSize: 14, maxWidth: 450, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.6 }}>
+                  Select your data sources, apply a template, and choose your custom columns. Click <strong style={{ color: '#334155', fontWeight: 600 }}>Load Data Grid</strong> to preview your generated report before exporting to Excel.
+                </Typography.Text>
+              </Card>
             )}
-          </Space>
-        </AppShell>
+          </div>
+        </ConfigProvider>
+      </Space>
+    </AppShell>
   )
 }
