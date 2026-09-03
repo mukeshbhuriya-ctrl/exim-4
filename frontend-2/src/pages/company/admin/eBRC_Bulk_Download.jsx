@@ -1,13 +1,12 @@
-import { DownloadOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
-import { Button, Card, DatePicker, Form, Layout, Space, Table, Tag, Typography, message } from 'antd'
+import { DownloadOutlined, PlusOutlined, ReloadOutlined, CloseOutlined } from '@ant-design/icons'
+import { Button, DatePicker, Form, Space, Table, Tag, Typography, message, Tooltip } from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import CompanySidebar from '../../../components/company/sidebar.jsx'
 import AppShell from '../../../components/layout/AppShell.jsx'
-import PageHeader from '../../../components/common/PageHeader.jsx'
+import ProDataTable from '../../../components/shared/ProDataTable.jsx'
 import { splitEbrcDateRange } from '../../../utils/ebrcDateRangeSplit.js'
 
-const { Content } = Layout
 const { Title, Text } = Typography
 
 const EBRC_API = '/api/company/admin/ebrc/eBRC-Bulk-Download-request'
@@ -64,17 +63,15 @@ function cellText(value) {
 export default function CompanyAdminEbrcBulkDownloadPage() {
   const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '')
 
-  const [rows, setRows] = useState([])
-  const [count, setCount] = useState(0)
-  const [loading, setLoading] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [downloadingAttachId, setDownloadingAttachId] = useState(null)
   const [submittingRequest, setSubmittingRequest] = useState(false)
   const [splitChunks, setSplitChunks] = useState([])
+  const [showRequestForm, setShowRequestForm] = useState(false)
   const [submitForm] = Form.useForm()
 
-  const fetchRequests = useCallback(async () => {
-    if (!BACKEND_URL) return
-    setLoading(true)
+  const fetchGrid = useCallback(async (page = 1, pageSize = 20) => {
+    if (!BACKEND_URL) return { data: [], meta: { total: 0 } }
     try {
       const res = await fetch(`${BACKEND_URL}${EBRC_API}`, {
         method: 'GET',
@@ -85,23 +82,16 @@ export default function CompanyAdminEbrcBulkDownloadPage() {
         throw new Error(data?.detail || data?.message || `Failed to load eBRC requests (${res.status})`)
       }
       const list = normalizeEbrcRows(data).filter((r) => r && typeof r === 'object')
-      setRows(list)
-      setCount(Number(data?.count) || list.length)
       if (data?.success === false) {
         message.warning(data?.message || 'Request completed with issues')
       }
+      const start = (page - 1) * pageSize
+      return { data: list.slice(start, start + pageSize), meta: { total: list.length } }
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Failed to load eBRC bulk download requests')
-      setRows([])
-      setCount(0)
-    } finally {
-      setLoading(false)
+      return { data: [], meta: { total: 0 } }
     }
   }, [BACKEND_URL])
-
-  useEffect(() => {
-    fetchRequests()
-  }, [fetchRequests])
 
   const loadSplitPreview = useCallback((from, to) => {
     if (!isValidRange(from, to)) {
@@ -172,7 +162,10 @@ export default function CompanyAdminEbrcBulkDownloadPage() {
             `Bulk download request submitted for ${data?.submittedCount ?? splitChunks.length} range(s).`,
         )
       }
-      await fetchRequests()
+      setRefreshKey(prev => prev + 1)
+      submitForm.resetFields()
+      setSplitChunks([])
+      setShowRequestForm(false)
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Failed to submit bulk download request')
     } finally {
@@ -242,28 +235,24 @@ export default function CompanyAdminEbrcBulkDownloadPage() {
         title: 'Request Type',
         dataIndex: 'requestType',
         key: 'requestType',
-        width: 120,
         render: cellText,
       },
       {
         title: 'From Date',
         dataIndex: 'fromDate',
         key: 'fromDate',
-        width: 120,
         render: cellText,
       },
       {
         title: 'To Date',
         dataIndex: 'toDate',
         key: 'toDate',
-        width: 120,
         render: cellText,
       },
       {
         title: 'Status',
         dataIndex: 'status',
         key: 'status',
-        width: 120,
         render: (value) => {
           const text = cellText(value)
           if (text === '—') return text
@@ -274,14 +263,12 @@ export default function CompanyAdminEbrcBulkDownloadPage() {
         title: 'Attach ID',
         dataIndex: 'attachId',
         key: 'attachId',
-        width: 130,
         render: (value) => <Text code>{cellText(value)}</Text>,
       },
       {
         title: 'Request Date Time',
         dataIndex: 'requestDateTime',
         key: 'requestDateTime',
-        width: 180,
         ellipsis: true,
         render: cellText,
       },
@@ -353,112 +340,106 @@ export default function CompanyAdminEbrcBulkDownloadPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="middle" style={{ width: '100%', minWidth: 0 }}>
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                gap: 12,
-                flexWrap: 'wrap',
-              }}
-            >
-              <div>
-                <Title level={3} style={{ margin: 0 }}>
-                  eBRC Bulk Download
-                </Title>
-              </div>
-              <Button
-                icon={<ReloadOutlined />}
-                loading={loading}
-                onClick={fetchRequests}
-                disabled={!BACKEND_URL || loading || submittingRequest}
-              >
-                Refresh
-              </Button>
-            </div>
+      <Space direction="vertical" size="middle" style={{ width: '100%', minWidth: 0 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '12px 16px',
+            background: '#f8f9fa',
+            border: '1px solid var(--exim-border-light)',
+            borderRadius: 8,
+            flexWrap: 'wrap',
+            gap: 16
+          }}
+        >
+          <div>
+            <Title level={5} style={{ margin: 0 }}>eBRC Bulk Download</Title>
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              View and download your DGFT eBRC bulk requests.
+            </Text>
+          </div>
+        </div>
 
-            <Card size="small" title="Submit bulk download request">
-              <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-                Select a large date range ({DATE_FORMAT}). The system auto-splits each month into
-                1–15 and 16–end (30-day months: 16–30, 31-day months: 16–31) and submits one
-                request per chunk.
-              </Text>
-              <Form
-                form={submitForm}
-                layout="vertical"
-                disabled={submittingRequest}
-                onValuesChange={(changed, all) => {
-                  const range = all.dateRange
-                  if (!changed.dateRange || !Array.isArray(range)) return
-                  const [from, to] = range
-                  if (from?.isValid() && to?.isValid()) {
-                    loadSplitPreview(from, to)
-                  } else {
-                    setSplitChunks([])
-                  }
-                }}
-              >
-                <Form.Item
-                  name="dateRange"
-                  label="Date range"
-                  rules={[{ required: true, message: 'Date range is required' }]}
-                >
-                  <DatePicker.RangePicker format={DATE_FORMAT} allowClear={false} style={{ width: '100%' }} />
-                </Form.Item>
-                <Form.Item>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    loading={submittingRequest}
-                    disabled={!BACKEND_URL || !splitChunks.length}
-                    onClick={handleSubmitBulkRequest}
+        <div style={{ width: '100%', minWidth: 0 }}>
+          <ProDataTable
+            columns={columns}
+            fetchData={fetchGrid}
+            refreshKey={refreshKey}
+            rowKey={(row, index) => `${row?.attachId ?? row?.srNo ?? 'row'}-${row?.requestDateTime ?? index}`}
+            showSelectionColumn={false}
+            globalSearchPlaceholder="Search eBRC requests..."
+            customToolbarActions={
+              <Space size={12} align="center">
+                {!showRequestForm ? (
+                  <Tooltip title="Bulk Download request">
+                    <Button
+                      type="primary"
+                      icon={<PlusOutlined />}
+                      onClick={() => setShowRequestForm(true)}
+                    >
+                      Bulk Download
+                    </Button>
+                  </Tooltip>
+                ) : (
+                  <Form
+                    form={submitForm}
+                    layout="inline"
+                    disabled={submittingRequest}
+                    onValuesChange={(changed, all) => {
+                      const range = all.dateRange
+                      if (!changed.dateRange || !Array.isArray(range)) return
+                      const [from, to] = range
+                      if (from?.isValid() && to?.isValid()) {
+                        loadSplitPreview(from, to)
+                      } else {
+                        setSplitChunks([])
+                      }
+                    }}
                   >
-                    Submit {splitChunks.length ? `${splitChunks.length} request(s)` : 'request'}
-                  </Button>
-                </Form.Item>
-              </Form>
-
-              {splitChunks.length ? (
-                <div style={{ marginTop: 16 }}>
-                  <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                    Split preview
-                  </Text>
-                  <Table
-                    rowKey={(row, index) => `${row.fromDate}-${row.toDate}-${index}`}
-                    size="small"
-                    columns={splitPreviewColumns}
-                    dataSource={splitChunks}
-                    pagination={false}
-                    locale={{ emptyText: 'Select a date range to preview splits' }}
-                  />
-                </div>
-              ) : null}
-            </Card>
-
-            <div style={{ minWidth: 0, width: '100%', overflowX: 'auto' }}>
-              <Table
-                rowKey={(row, index) =>
-                  `${row?.attachId ?? row?.srNo ?? 'row'}-${row?.requestDateTime ?? index}`
-                }
-                size="small"
-                loading={loading}
-                columns={columns}
-                dataSource={rows}
-                pagination={{
-                  pageSize: 20,
-                  showSizeChanger: true,
-                  showTotal: (total) => `${total} request(s)`,
-                }}
-                scroll={{ x: 'max-content' }}
-                locale={{ emptyText: 'No eBRC bulk download requests found' }}
-              />
-            </div>
-
-            {!loading && rows.length > 0 ? (
-              <Text type="secondary">Total: {count || rows.length}</Text>
-            ) : null}
-          </Space>
-        </AppShell>
+                    <Form.Item
+                      name="dateRange"
+                      style={{ margin: 0, marginRight: 8, width: 260 }}
+                      rules={[{ required: true, message: 'Date range required' }]}
+                    >
+                      <DatePicker.RangePicker format={DATE_FORMAT} allowClear={false} placeholder={['Start Date', 'End Date']} />
+                    </Form.Item>
+                    <Form.Item style={{ margin: 0 }}>
+                      <Button
+                        type="primary"
+                        icon={<PlusOutlined />}
+                        loading={submittingRequest}
+                        disabled={!BACKEND_URL || !splitChunks.length}
+                        onClick={handleSubmitBulkRequest}
+                      >
+                        Submit {splitChunks.length ? `(${splitChunks.length})` : ''}
+                      </Button>
+                    </Form.Item>
+                    <Form.Item style={{ margin: 0, marginLeft: 4 }}>
+                      <Button
+                        type="text"
+                        icon={<CloseOutlined />}
+                        onClick={() => {
+                          setShowRequestForm(false)
+                          submitForm.resetFields()
+                          setSplitChunks([])
+                        }}
+                      />
+                    </Form.Item>
+                  </Form>
+                )}
+                <Button
+                  icon={<ReloadOutlined />}
+                  onClick={() => setRefreshKey(prev => prev + 1)}
+                >
+                  Reload
+                </Button>
+              </Space>
+            }
+          />
+        </div>
+      </Space>
+    </AppShell>
   )
 }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { Inbox } from 'lucide-react'
 import {
   Table,
   Input,
@@ -202,7 +203,7 @@ const CustomHeaderCell = ({ col, columnId, columnFilters, onFilterChange, active
   const hasFilter = Array.isArray(columnFilters[columnId])
     ? columnFilters[columnId].length > 0
     : !!(columnFilters[columnId])
-    
+
   const isFilterOpen = activeHeaderFilters.has(columnId) || (lockActiveFilters && hasFilter)
 
   return (
@@ -295,7 +296,7 @@ const ProDataTable = ({
   onAdd,
   onExport,
   columnFilters = DEFAULT_COLUMN_FILTERS,
-  onFilterChange = () => {},
+  onFilterChange = () => { },
   refreshKey = 0,
   topFilters = DEFAULT_TOP_FILTERS,
   globalSearchPlaceholder = "Search...",
@@ -389,7 +390,7 @@ const ProDataTable = ({
     return columns.map((col) => {
       const colId = col.id || col.key || col.dataIndex
       const isSticky = stickyColumns.includes(colId)
-      
+
       const customTitle = (
         <CustomHeaderCell
           col={col}
@@ -461,7 +462,7 @@ const ProDataTable = ({
               {customToolbarActions}
             </div>
           )}
-          
+
           {topFilters.map((tf, i) => (
             <Select
               key={i}
@@ -479,10 +480,10 @@ const ProDataTable = ({
             </Tooltip>
           )}
 
-          <TableSettings 
-            columns={columns} 
-            stickyColumns={stickyColumns} 
-            setStickyColumns={setStickyColumns} 
+          <TableSettings
+            columns={columns}
+            stickyColumns={stickyColumns}
+            setStickyColumns={setStickyColumns}
           />
 
           {onAdd && (
@@ -531,7 +532,30 @@ const ProDataTable = ({
             const isSelected = selectedRows.has(typeof rowKey === 'function' ? rowKey(record) : record[rowKey])
             return isSelected ? 'pro-table-row-selected' : 'pro-table-row'
           }}
-          locale={{ emptyText: <div style={{ height: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--exim-gray-400)', fontWeight: 500 }}>No records found.</div> }}
+          locale={{
+            emptyText: loading ? (
+              <div style={{ height: 120 }} />
+            ) : (
+              <div style={{ padding: '64px 0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  padding: 16,
+                  borderRadius: '50%',
+                  marginBottom: 16,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                }}>
+                  <Inbox size={32} color="#64748b" strokeWidth={1.5} />
+                </div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: '#0f172a', marginBottom: 4 }}>
+                  No data available
+                </div>
+                <div style={{ fontSize: 13, color: '#64748b', maxWidth: 300, textAlign: 'center' }}>
+                  We couldn't find any data matching your current view or filters.
+                </div>
+              </div>
+            )
+          }}
           expandable={expandable}
         />
 

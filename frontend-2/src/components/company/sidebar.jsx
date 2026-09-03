@@ -1,333 +1,466 @@
-import { Layout, Menu } from 'antd'
-import {
-  DashboardOutlined,
-  SettingOutlined,
-  SyncOutlined,
-  FileTextOutlined,
-  AuditOutlined,
-  BankOutlined,
-  LinkOutlined,
-  BarChartOutlined,
-  CloudDownloadOutlined,
-  AccountBookOutlined,
-  LogoutOutlined,
-} from '@ant-design/icons'
-import { useEffect, useRef, useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { clearCompanySession, getCompanySession } from '../../utils/companySession.js'
+import {
+  LayoutDashboard, Layers, Settings, Zap, Link2, Ship, Landmark,
+  BookOpen, BarChart3, FileCode2, ChevronDown, PanelLeftClose,
+  PanelLeft, LogOut, Circle, RefreshCcw
+} from 'lucide-react'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
-const { Sider } = Layout
-
-const INIT_PATHS = [
-  '/admin/header-mapping',
-  '/admin/sales-data-clean',
-  '/admin/combination',
-  '/admin/connect-combination',
-]
-const PROCESS_PATHS = [
-  '/admin/upload-pdf',
-  '/admin/fetch-pdf-data',
-  '/admin/upload-sales',
-  '/admin/start-process',
-  '/admin/manual-process-match',
-  '/admin/inv',
-  '/admin/fetch-from-sap-sales',
-]
-const SHIPPING_PATHS = ['/admin/sb-batch', '/admin/sb']
-const DGFT_PATHS = [
-  '/admin/dgft/manual',
-  '/admin/dgft/excel',
-  '/admin/dgft/excel-to-process',
-  '/admin/ebrc-bulk-download',
-  '/admin/store-bulk-download',
-  '/admin/pdf/dgft',
-  '/admin/dgft',
-]
-const JV_PATHS = ['/admin/jv-dbk', '/admin/jv-rodtp']
-const CHA_PATHS = ['/admin/cha/process']
-const CONFIGURE_PATHS = [
-  '/admin/configure/sales',
-  '/admin/configure/pdf',
-  '/admin/configure/cha',
-  '/admin/configure/dgft',
-  '/admin/configure/automation',
-  '/admin/configure/automation-logs',
-]
-
-function openKeysForPathname(pathname) {
-  if (INIT_PATHS.some((p) => pathname === p)) return ['initialization']
-  if (CONFIGURE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return ['configure']
-  if (PROCESS_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return ['process']
-  if (SHIPPING_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return ['shipping-bills']
-  if (DGFT_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return ['dgft']
-  if (JV_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return ['jv']
-  if (CHA_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return ['cha']
-  return []
-}
-
-const menuItems = [
+/* ═══════════════════════════════════════════════════════════
+   Navigation Configuration
+   ═══════════════════════════════════════════════════════════ */
+const NAV = [
+  { t: 'item', key: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { t: 'label', label: 'Setup' },
   {
-    key: '/admin/dashboard',
-    icon: <DashboardOutlined />,
-    label: 'Dashboard',
-  },
-  {
-    key: 'initialization',
-    icon: <FileTextOutlined />,
-    label: 'Initialization',
-    children: [
+    t: 'group', key: 'initialization', label: 'Initialization', icon: Layers, children: [
       { key: '/admin/header-mapping', label: 'Header Mapping' },
       { key: '/admin/sales-data-clean', label: 'Sales Data Clean' },
       { key: '/admin/combination', label: 'Combination' },
       { key: '/admin/connect-combination', label: 'Connection' },
-    ],
+    ]
   },
+  { t: 'label', label: 'Settings' },
   {
-    key: 'configure',
-    icon: <SettingOutlined />,
-    label: 'Configure',
-    children: [
+    t: 'group', key: 'configure', label: 'Configure', icon: Settings, children: [
       { key: '/admin/configure/sales', label: 'SAP Setup' },
       { key: '/admin/configure/pdf', label: 'LEO Copy Mail Setup' },
       { key: '/admin/configure/cha', label: 'ICEGATE CHA Setup' },
       { key: '/admin/configure/dgft', label: 'DGFT Setup' },
       { key: '/admin/configure/automation', label: 'Automation' },
       { key: '/admin/configure/automation-logs', label: 'Automation Logs' },
-    ],
+    ]
   },
+  { t: 'label', label: 'Operations' },
   {
-    key: 'process',
-    icon: <SyncOutlined />,
-    label: 'Process',
-    children: [
+    t: 'group', key: 'process', label: 'Process', icon: Zap, children: [
       { key: '/admin/upload-pdf', label: 'LEO Copy' },
-      // { key: '/admin/fetch-pdf-data', label: 'Fetch PDF Data' },
       { key: '/admin/upload-sales', label: 'Sales' },
-      // { key: '/admin/fetch-from-sap-sales', label: 'Fetch from SAP' },
       { key: '/admin/start-process', label: 'Start Process' },
       { key: '/admin/manual-process-match', label: 'Manual Match' },
       { key: '/admin/inv', label: 'Matched Invoices' },
-    ],
+    ]
   },
   {
-    key: 'cha',
-    icon: <LinkOutlined />,
-    label: 'CHA',
-    children: [{ key: '/admin/cha/process', label: 'Monthly Process' }],
+    t: 'group', key: 'cha', label: 'CHA', icon: Link2, children: [
+      { key: '/admin/cha/process', label: 'Monthly Process' },
+    ]
   },
+  { t: 'label', label: 'Compliance' },
   {
-    key: 'shipping-bills',
-    icon: <AuditOutlined />,
-    label: 'Shipping Bills',
-    children: [
+    t: 'group', key: 'shipping-bills', label: 'Shipping Bills', icon: Ship, children: [
       { key: '/admin/sb', label: 'SB Records' },
-      { key: '/admin/sb-batch', label: 'SB Batch' },
-    ],
+    ]
   },
   {
-    key: 'dgft',
-    icon: <BankOutlined />,
-    label: 'DGFT',
-    children: [
+    t: 'group', key: 'dgft', label: 'DGFT', icon: Landmark, children: [
       { key: '/admin/dgft', label: 'DGFT Records' },
-      // { key: '/admin/dgft/manual', label: 'DGFT Manual' },
-      { key: '/admin/dgft/excel', label: 'DGFT Batch Upload' },
-      // { key: '/admin/dgft/excel-to-process', label: 'Excel → Process' },
       { key: '/admin/ebrc-bulk-download', label: 'eBRC Bulk Request' },
       { key: '/admin/store-bulk-download', label: 'Store Bulk Download' },
       { key: '/admin/pdf/dgft', label: 'eBRC PDFs' },
-    ],
+    ]
   },
   {
-    key: 'jv',
-    icon: <AccountBookOutlined />,
-    label: 'Journal Voucher',
-    children: [
+    t: 'group', key: 'jv', label: 'Journal Voucher', icon: BookOpen, children: [
       { key: '/admin/jv-dbk', label: 'DBK' },
       { key: '/admin/jv-rodtp', label: 'RoDTEP' },
-    ],
+    ]
   },
+  { t: 'label', label: 'Analytics' },
+  { t: 'item', key: '/admin/reports', label: 'Reports', icon: BarChart3 },
+  { t: 'item', key: '/admin/reports/templates', label: 'Report Templates', icon: FileCode2 },
+  { t: 'label', label: 'Manual Fetch' },
   {
-    key: '/admin/reports',
-    icon: <BarChartOutlined />,
-    label: 'Reports',
-  },
-  {
-    key: '/admin/reports/templates',
-    icon: <CloudDownloadOutlined />,
-    label: 'Report Templates',
+    t: 'group', key: 'manual-fetch', label: 'Manual Fetch', icon: RefreshCcw, children: [
+      { key: '/admin/sb-batch', label: 'SB Batch' },
+      { key: '/admin/dgft/excel', label: 'DGFT Batch Upload' },
+    ]
   },
 ]
 
+function findGroup(p) {
+  for (const n of NAV)
+    if (n.t === 'group' && n.children?.some(c => p === c.key))
+      return n.key
+  return null
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Main Sidebar Component - using guaranteed inline styles for colors
+   ═══════════════════════════════════════════════════════════ */
 export default function CompanySidebar() {
   const navigate = useNavigate()
-  const location = useLocation()
-
-  const [openKeys, setOpenKeys] = useState([])
+  const { pathname } = useLocation()
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem('exim-sc') === '1')
+  const [openKeys, setOpenKeys] = useState(() => {
+    const g = findGroup(pathname)
+    return g ? [g] : []
+  })
   const [session, setSession] = useState(() => getCompanySession())
-  const lastRouteOpenKeysRef = useRef(null)
+  const prevGroup = useRef(findGroup(pathname))
+
+  // Theme constants
+  const COLORS = {
+    bg: '#111827', // Gray 900
+    border: '#374151', // Gray 700
+    textMuted: '#9CA3AF', // Gray 400
+    textNormal: '#D1D5DB', // Gray 300
+    textBright: '#F9FAFB', // Gray 50
+    hoverBg: '#1F2937', // Gray 800
+    activeBg: 'rgba(59, 130, 246, 0.12)', // Subtle blue background
+    activeText: '#60A5FA', // Bright blue text
+    activeChildBg: 'transparent',
+    activeChildText: '#60A5FA', // Bright blue text
+    brandGradient: 'linear-gradient(135deg, #3B82F6, #1D4ED8)'
+  }
 
   useEffect(() => {
     setSession(getCompanySession())
-  }, [location.pathname])
+    const g = findGroup(pathname)
+    if (g && g !== prevGroup.current) { prevGroup.current = g; setOpenKeys(p => p.includes(g) ? p : [...p, g]) }
+  }, [pathname])
+
+  const toggle = (k) => setOpenKeys(p => p.includes(k) ? p.filter(x => x !== k) : [...p, k])
+  const col = () => { setCollapsed(p => { const n = !p; localStorage.setItem('exim-sc', n ? '1' : '0'); return n }); }
 
   useEffect(() => {
-    const next = openKeysForPathname(location.pathname)
-    const prevSig =
-      lastRouteOpenKeysRef.current == null ? null : lastRouteOpenKeysRef.current.join('\0')
-    const nextSig = next.join('\0')
-    if (prevSig === nextSig) {
-      return
-    }
-    lastRouteOpenKeysRef.current = next
-    setOpenKeys(next)
-  }, [location.pathname])
+    const handleToggle = () => col()
+    window.addEventListener('toggle-sidebar', handleToggle)
+    return () => window.removeEventListener('toggle-sidebar', handleToggle)
+  }, [])
 
   return (
-    <Sider
-      width={260}
-      theme="dark"
+    <aside
       style={{
-        background: 'var(--exim-sidebar-bg)',
-        borderRight: 'none',
         position: 'sticky',
         top: 0,
+        backgroundColor: COLORS.bg,
+        borderRight: `1px solid ${COLORS.border}`,
+        width: collapsed ? '68px' : '260px',
+        transition: 'width 300ms ease',
+        display: 'flex',
+        flexDirection: 'column',
         height: '100vh',
+        overflow: 'hidden',
+        zIndex: 40
       }}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        {/* Brand */}
-        <div
-          style={{
-            padding: '20px 20px 16px',
-            borderBottom: '1px solid rgba(255, 255, 255, 0.06)',
-            flexShrink: 0,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                borderRadius: 10,
-                background: 'linear-gradient(135deg, #1B4DFF 0%, #3B6FFF 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 2px 8px rgba(27, 77, 255, 0.3)',
-              }}
-            >
-              <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
-                <path d="M8 10h10M8 16h14M8 22h10" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"/>
-                <path d="M22 8l4 4-4 4" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+      {/* ── Brand ── */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        borderBottom: `1px solid ${COLORS.border}`,
+        padding: collapsed ? '16px' : '16px 20px',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        gap: '12px',
+        flexShrink: 0
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '36px',
+          height: '36px',
+          borderRadius: '8px',
+          background: COLORS.brandGradient,
+          flexShrink: 0
+        }}>
+          <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+            <path d="M8 10h10M8 16h14M8 22h10" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M22 8l4 4-4 4" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        {!collapsed && (
+          <div style={{ minWidth: 0, flex: 1, overflow: 'hidden' }}>
+            <div style={{
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              fontSize: '15px',
+              fontWeight: 600,
+              color: COLORS.textBright
+            }} title={session.companyName || 'Exim Automation'}>
+              {session.companyName || 'Exim Automation'}
             </div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div
-                title={session.companyName || 'EXIM'}
+            <div style={{
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              fontSize: '12px',
+              color: COLORS.textMuted,
+              marginTop: '2px'
+            }} title={session.email || ''}>
+              {session.email || 'Enterprise Suite'}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Nav ── */}
+      <nav style={{
+        flex: 1,
+        overflowY: 'auto',
+        overflowX: 'hidden',
+        padding: '12px 8px',
+        scrollbarWidth: 'thin',
+        scrollbarColor: `${COLORS.border} transparent`
+      }}>
+        {NAV.map((n, i) => {
+          // Section label
+          if (n.t === 'label') {
+            if (collapsed) return <div key={i} style={{ margin: '16px auto', height: '1px', width: '24px', backgroundColor: COLORS.border }} />
+            return (
+              <div key={i} style={{
+                marginTop: i === 1 ? '4px' : '20px',
+                marginBottom: '8px',
+                paddingLeft: '12px',
+                fontSize: '11px',
+                fontWeight: 600,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: COLORS.textMuted
+              }}>
+                {n.label}
+              </div>
+            )
+          }
+
+          // Top-level item
+          if (n.t === 'item') {
+            const active = pathname === n.key
+            const Icon = n.icon
+            const button = (
+              <button
+                key={n.key}
+                onClick={() => navigate(n.key)}
+                onMouseEnter={(e) => { if (!active) e.currentTarget.style.backgroundColor = COLORS.hoverBg; e.currentTarget.style.color = COLORS.textBright; }}
+                onMouseLeave={(e) => { if (!active) e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = COLORS.textNormal; }}
                 style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: '#FFFFFF',
-                  lineHeight: 1.2,
-                  letterSpacing: '-0.3px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  width: '100%',
+                  border: active ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid transparent',
+                  cursor: 'pointer',
+                  borderRadius: '6px',
+                  marginBottom: '4px',
+                  backgroundColor: active ? COLORS.activeBg : 'transparent',
+                  color: active ? COLORS.activeText : COLORS.textNormal,
+                  padding: collapsed ? '10px' : '10px 12px',
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  gap: '12px',
+                  transition: 'background-color 0.2s, color 0.2s',
+                  fontSize: '14px',
+                  fontWeight: active ? 500 : 400
                 }}
               >
-                {session.companyName || 'EXIM'}
-              </div>
-              {session.email ? (
-                <div
-                  title={session.email}
+                <Icon size={collapsed ? 20 : 18} strokeWidth={active ? 2 : 1.75} style={{ flexShrink: 0, color: active ? COLORS.activeText : COLORS.textMuted }} />
+                {!collapsed && <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.label}</span>}
+              </button>
+            )
+
+            if (collapsed) {
+              return (
+                <Tooltip key={n.key} delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    {button}
+                  </TooltipTrigger>
+                  <TooltipContent side="right" sideOffset={14} className="bg-slate-900 text-white font-medium border-slate-800">
+                    {n.label}
+                  </TooltipContent>
+                </Tooltip>
+              )
+            }
+            return button
+          }
+
+          // Collapsible group
+          if (n.t === 'group') {
+            const Icon = n.icon
+            const open = openKeys.includes(n.key)
+            const activeChild = n.children?.some(c => pathname === c.key)
+
+            if (collapsed) {
+              return (
+                <Tooltip key={n.key} delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => n.children?.[0] && navigate(n.children[0].key)}
+                      onMouseEnter={(e) => { if (!activeChild) e.currentTarget.style.backgroundColor = COLORS.hoverBg; }}
+                      onMouseLeave={(e) => { if (!activeChild) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '100%',
+                        border: activeChild ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid transparent',
+                        cursor: 'pointer',
+                        borderRadius: '6px',
+                        marginBottom: '4px',
+                        backgroundColor: activeChild ? COLORS.activeBg : 'transparent',
+                        color: activeChild ? COLORS.activeText : COLORS.textNormal,
+                        padding: '10px',
+                        transition: 'background-color 0.2s'
+                      }}
+                    >
+                      <Icon size={20} strokeWidth={activeChild ? 2 : 1.75} style={{ color: activeChild ? COLORS.activeText : COLORS.textMuted }} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" sideOffset={14} className="bg-slate-900 text-white font-medium border-slate-800">
+                    {n.label}
+                  </TooltipContent>
+                </Tooltip>
+              )
+            }
+
+            return (
+              <div key={n.key} style={{ marginBottom: '4px' }}>
+                <button
+                  onClick={() => toggle(n.key)}
+                  onMouseEnter={(e) => { if (!activeChild) e.currentTarget.style.backgroundColor = COLORS.hoverBg; e.currentTarget.style.color = COLORS.textBright; }}
+                  onMouseLeave={(e) => { if (!activeChild) e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = COLORS.textNormal; }}
                   style={{
-                    marginTop: 6,
-                    fontSize: 11,
-                    fontWeight: 400,
-                    color: 'rgba(148, 163, 184, 0.85)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    width: '100%',
+                    border: 'none',
+                    cursor: 'pointer',
+                    borderRadius: '6px',
+                    backgroundColor: 'transparent',
+                    color: activeChild ? COLORS.textBright : COLORS.textNormal,
+                    padding: '10px 12px',
+                    gap: '12px',
+                    transition: 'background-color 0.2s, color 0.2s',
+                    fontSize: '14px',
+                    fontWeight: activeChild ? 500 : 400
                   }}
                 >
-                  {session.email}
+                  <Icon size={18} strokeWidth={activeChild ? 2 : 1.75} style={{ flexShrink: 0, color: activeChild ? COLORS.activeChildText : COLORS.textMuted }} />
+                  <span style={{ flex: 1, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{n.label}</span>
+                  <ChevronDown size={16} strokeWidth={2} style={{ flexShrink: 0, color: COLORS.textMuted, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </button>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateRows: open ? '1fr' : '0fr',
+                  transition: 'grid-template-rows 0.2s ease-in-out'
+                }}>
+                  <div style={{ overflow: 'hidden' }}>
+                    <div style={{
+                      marginLeft: '21px',
+                      borderLeft: `1px solid ${COLORS.border}`,
+                      paddingLeft: '12px',
+                      paddingTop: '4px',
+                      paddingBottom: '4px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '2px'
+                    }}>
+                      {n.children?.map(child => {
+                        const active = pathname === child.key
+                        return (
+                          <button
+                            key={child.key}
+                            onClick={() => navigate(child.key)}
+                            onMouseEnter={(e) => { if (!active) e.currentTarget.style.backgroundColor = COLORS.hoverBg; e.currentTarget.style.color = COLORS.textBright; }}
+                            onMouseLeave={(e) => { if (!active) e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = COLORS.textNormal; }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              width: '100%',
+                              border: active ? '1px solid rgba(59, 130, 246, 0.2)' : '1px solid transparent',
+                              cursor: 'pointer',
+                              borderRadius: '6px',
+                              backgroundColor: active ? COLORS.activeChildBg : 'transparent',
+                              color: active ? COLORS.activeChildText : COLORS.textNormal,
+                              padding: '8px 10px',
+                              gap: '10px',
+                              transition: 'background-color 0.2s, color 0.2s',
+                              fontSize: '13px',
+                              fontWeight: active ? 500 : 400
+                            }}
+                          >
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{child.label}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
-              ) : null}
-            </div>
-          </div>
-        </div>
+              </div>
+            )
+          }
 
-        {/* Navigation */}
-        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
-          <Menu
-            mode="inline"
-            theme="dark"
-            selectedKeys={[location.pathname]}
-            openKeys={openKeys}
-            onOpenChange={setOpenKeys}
-            items={menuItems}
-            onClick={({ key }) => {
-              if (key.startsWith('/admin')) navigate(key)
-            }}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              padding: '8px 0',
-            }}
-          />
-        </div>
+          return null
+        })}
+      </nav>
 
-        {/* Footer */}
-        <div
-          style={{
-            padding: '12px 20px',
-            borderTop: '1px solid rgba(255, 255, 255, 0.06)',
-            background: 'var(--exim-sidebar-bg)',
-            flexShrink: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div style={{
-            fontSize: 11,
-            color: 'rgba(148, 163, 184, 0.5)',
-          }}>
-            EXIM Automation v1.0
-          </div>
-          
-          <div
-            onClick={() => {
-              clearCompanySession()
-              navigate('/login')
-            }}
-            title="Log out"
+      {/* ── Footer ── */}
+      <div style={{
+        flexShrink: 0,
+        borderTop: `1px solid ${COLORS.border}`,
+        padding: '12px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px',
+        alignItems: collapsed ? 'center' : 'stretch'
+      }}>
+        {collapsed ? (
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => { clearCompanySession(); navigate('/login') }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'; e.currentTarget.style.color = '#F87171'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = COLORS.textNormal; }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '100%',
+                  border: 'none',
+                  cursor: 'pointer',
+                  borderRadius: '6px',
+                  backgroundColor: 'transparent',
+                  color: COLORS.textNormal,
+                  padding: '10px',
+                  gap: '12px',
+                  transition: 'background-color 0.2s, color 0.2s',
+                  fontSize: '13px'
+                }}
+              >
+                <LogOut size={18} strokeWidth={1.75} style={{ flexShrink: 0, color: 'inherit' }} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={14} className="bg-slate-900 text-white font-medium border-slate-800">
+              Sign out
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <button
+            onClick={() => { clearCompanySession(); navigate('/login') }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)'; e.currentTarget.style.color = '#F87171'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = COLORS.textNormal; }}
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              width: 28,
-              height: 28,
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--exim-sidebar-text)',
+              justifyContent: 'flex-start',
+              width: '100%',
+              border: 'none',
               cursor: 'pointer',
-              transition: 'all 0.2s',
-              marginRight: -4,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#FFFFFF'
-              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'var(--exim-sidebar-text)'
-              e.currentTarget.style.background = 'transparent'
+              borderRadius: '6px',
+              backgroundColor: 'transparent',
+              color: COLORS.textNormal,
+              padding: '10px 12px',
+              gap: '12px',
+              transition: 'background-color 0.2s, color 0.2s',
+              fontSize: '13px'
             }}
           >
-            <LogoutOutlined style={{ fontSize: 15 }} />
-          </div>
-        </div>
+            <LogOut size={18} strokeWidth={1.75} style={{ flexShrink: 0, color: 'inherit' }} />
+            <span style={{ flex: 1, textAlign: 'left' }}>Sign out</span>
+          </button>
+        )}
       </div>
-    </Sider>
+    </aside>
   )
 }

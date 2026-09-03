@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Modal, Space, Spin, Tag, Typography, message } from 'antd'
 import {
   FileTextOutlined,
@@ -12,6 +12,7 @@ import {
   ClockCircleOutlined,
   ExclamationCircleOutlined,
   CloseCircleOutlined,
+  ControlOutlined
 } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import AppShell from '../../../components/layout/AppShell.jsx'
@@ -19,8 +20,9 @@ import CompanySidebar from '../../../components/company/sidebar.jsx'
 import PageHeader from '../../../components/common/PageHeader.jsx'
 import StatCard from '../../../components/common/StatCard.jsx'
 import MatchPieChart from '../../../components/common/MatchPieChart.jsx'
+import '../../../components/shared/ProDataTable.css'
 
-const { Text } = Typography
+const { Text, Title } = Typography
 
 const EMPTY_MATCH_STATS = {
   matched: 0,
@@ -128,6 +130,14 @@ const QUICK_ACTIONS = [
     description: 'SAP, PDF, and automation settings',
     path: '/admin/configure/automation',
     color: 'var(--exim-gray-100)',
+  },
+  {
+    key: 'automation-logs',
+    icon: <ControlOutlined style={{ fontSize: 22, color: '#2563EB' }} />,
+    title: 'Automation Logs',
+    description: 'View daily execution status and errors',
+    path: '/admin/configure/automation-logs',
+    color: '#EFF6FF',
   },
 ]
 

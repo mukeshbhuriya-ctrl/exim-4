@@ -14,7 +14,7 @@ const { Title, Text } = Typography
 const REPORT_TYPE_OPTIONS = [
   { value: 'sales', label: 'Sales' },
   { value: 'pdf', label: 'PDF' },
-  { value: 'shipping', label: 'Shipping bill' },
+  { value: 'shipping', label: 'Shipping bill' },  
   { value: 'dgft', label: 'DGFT' },
   { value: 'cha', label: 'CHA' },
 ]
@@ -311,7 +311,7 @@ export default function CompanyAdminReportsPage() {
   const navigate = useNavigate()
   const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '')
 
-  const [reportTypes, setReportTypes] = useState(['pdf'])
+  const [reportTypes, setReportTypes] = useState([])
   const [availableTypes, setAvailableTypes] = useState(REPORT_TYPE_OPTIONS.map((o) => o.value))
   const [columnsByType, setColumnsByType] = useState({})
   const [selectedColumns, setSelectedColumns] = useState([])
@@ -436,6 +436,18 @@ export default function CompanyAdminReportsPage() {
           }
         }
         setSelectedColumns(Array.from(new Set(mapped)))
+        
+        let nextTypes = []
+        if (Array.isArray(template.type) && template.type.length > 0) {
+          nextTypes = template.type
+        } else if (template.mapping && typeof template.mapping === 'object') {
+          nextTypes = Object.keys(template.mapping)
+        }
+        
+        if (nextTypes.length > 0) {
+          setReportTypes(nextTypes)
+        }
+        
         message.success('Template loaded.')
       } catch (e) {
         setTemplateMapping({})
@@ -453,8 +465,8 @@ export default function CompanyAdminReportsPage() {
     return availableTypes
       .filter((value) => value !== 'sales')
       .map((value) => ({
-      value,
-      label: labelMap[value] || value.toUpperCase(),
+        value,
+        label: labelMap[value] || value.toUpperCase(),
       }))
   }, [availableTypes])
 
@@ -469,11 +481,7 @@ export default function CompanyAdminReportsPage() {
 
   useEffect(() => {
     if (!availableTypes.length) return
-    setReportTypes((prev) => {
-      const next = prev.filter((t) => availableTypes.includes(t))
-      if (next.length) return next
-      return availableTypes.includes('pdf') ? ['pdf'] : [availableTypes[0]]
-    })
+    setReportTypes((prev) => prev.filter((t) => availableTypes.includes(t)))
   }, [availableTypes])
 
   const activeColumnOptions = useMemo(() => {
@@ -684,7 +692,7 @@ export default function CompanyAdminReportsPage() {
   return (
     <AppShell sidebar={<CompanySidebar />}>
       <Space direction="vertical" size={16} style={{ width: '100%', minWidth: 0 }}>
-        
+
         <PageHeader
           title="Reports"
           description="Build cross-module reports, apply templates, and extract data directly to Excel."
@@ -707,15 +715,15 @@ export default function CompanyAdminReportsPage() {
             }
           }}
         >
-          <Card 
-            bordered={false} 
+          <Card
+            bordered={false}
             style={{ borderRadius: 12, boxShadow: '0 4px 20px -4px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.02)' }}
             bodyStyle={{ padding: 16 }}
           >
             <Form layout="vertical">
               <Row gutter={24}>
                 <Col xs={24} sm={12} md={8} lg={6}>
-                  <Form.Item 
+                  <Form.Item
                     label={<Text style={{ fontSize: 12, fontWeight: 600, color: '#475569', letterSpacing: '0.5px' }}><DatabaseOutlined style={{ marginRight: 6 }} />REPORT DATA SOURCES</Text>}
                     style={{ marginBottom: 12 }}
                   >
@@ -733,7 +741,7 @@ export default function CompanyAdminReportsPage() {
                 </Col>
 
                 <Col xs={24} sm={12} md={8} lg={8}>
-                  <Form.Item 
+                  <Form.Item
                     label={<Text style={{ fontSize: 12, fontWeight: 600, color: '#475569', letterSpacing: '0.5px' }}><LayoutOutlined style={{ marginRight: 6 }} />CONFIGURATION TEMPLATE</Text>}
                     style={{ marginBottom: 12 }}
                   >
@@ -753,7 +761,7 @@ export default function CompanyAdminReportsPage() {
                 </Col>
 
                 <Col xs={24} sm={12} md={8} lg={6}>
-                  <Form.Item 
+                  <Form.Item
                     label={<Text style={{ fontSize: 12, fontWeight: 600, color: '#475569', letterSpacing: '0.5px' }}><CalendarOutlined style={{ marginRight: 6 }} />DATE RANGE</Text>}
                     style={{ marginBottom: 12 }}
                   >
@@ -768,7 +776,7 @@ export default function CompanyAdminReportsPage() {
                 </Col>
 
                 <Col xs={24} sm={12} md={24} lg={4}>
-                  <Form.Item 
+                  <Form.Item
                     label={<Text style={{ fontSize: 12, fontWeight: 600, color: '#475569', letterSpacing: '0.5px' }}><ControlOutlined style={{ marginRight: 6 }} />CUSTOM COLUMNS</Text>}
                     style={{ marginBottom: 12 }}
                   >

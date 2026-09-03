@@ -1,10 +1,15 @@
 import { DownloadOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Input, Layout, Select, Space, Table, Typography, message } from 'antd'
+import { Button, Input, Layout, Select, Space, Typography, message, DatePicker } from 'antd'
 import { useCallback, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
+import dayjs from 'dayjs'
+import isBetween from 'dayjs/plugin/isBetween'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
+import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
+
+dayjs.extend(isBetween)
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -162,78 +167,89 @@ export default function CompanyAdminChaPage() {
 
   const [filterMonthAbbr, setFilterMonthAbbr] = useState(undefined)
   const [filterYear, setFilterYear] = useState(undefined)
+  
+  const [dateRange, setDateRange] = useState([dayjs().subtract(1, 'month').startOf('month'), dayjs().subtract(1, 'month').endOf('month')])
+  const [filterGstinInput, setFilterGstinInput] = useState('')
   const [filterGstin, setFilterGstin] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
+
   const [chaDataLoading, setChaDataLoading] = useState(false)
   const [mergingToSales, setMergingToSales] = useState(false)
   const [chaDataMeta, setChaDataMeta] = useState(null)
   const [chaDataRows, setChaDataRows] = useState([])
-  const [chaTablePage, setChaTablePage] = useState(1)
-  const [chaTablePageSize, setChaTablePageSize] = useState(20)
-
+  
   const chaDataColumns = useMemo(() => buildColumnsFromRows(chaDataRows), [chaDataRows])
 
-  const handleChaTablePaginationChange = useCallback((page, pageSize) => {
-    setChaTablePage(page)
-    setChaTablePageSize(pageSize)
-  }, [])
-
-  const handleChaTableSizeChange = useCallback((_, size) => {
-    setChaTablePage(1)
-    setChaTablePageSize(size)
-  }, [])
-
-  const fetchChaData = useCallback(async () => {
-    if (!BACKEND_URL) {
-      message.error('Backend URL is not configured (VITE_BACKEND_URL).')
-      return
-    }
+  const fetchDataForGrid = useCallback(async (params) => {
+    if (!BACKEND_URL) return { data: [], meta: { total: 0 } }
+    
     setChaDataLoading(true)
-    setChaDataMeta(null)
-    setChaDataRows([])
+    
     try {
-      const params = new URLSearchParams()
-      const month = composeSbMonthAndYear(filterMonthAbbr, filterYear)
+      const qs = new URLSearchParams()
+      
+      const start = dateRange && dateRange[0] ? dateRange[0] : dayjs().subtract(1, 'month').startOf('month')
+      const end = dateRange && dateRange[1] ? dateRange[1] : dayjs().subtract(1, 'month').endOf('month')
+      
+      const monthStr = start.format('MMM-YYYY').toUpperCase()
+      qs.set('month', monthStr)
+      
       const gstin = filterGstin.trim()
-      if (month) params.set('month', month)
-      if (gstin) params.set('gstin', gstin)
-      const qs = params.toString()
-      const url = `${BACKEND_URL}/api/company/admin/cha/get-cha-data${qs ? `?${qs}` : ''}`
-      const res = await fetch(url, {
-        method: 'GET',
-        credentials: 'include',
-      })
+      if (gstin) qs.set('gstin', gstin)
+      
+      const url = `${BACKEND_URL}/api/company/admin/cha/get-cha-data${qs.toString() ? `?${qs.toString()}` : ''}`
+      const res = await fetch(url, { method: 'GET', credentials: 'include' })
       const data = await res.json().catch(() => ({}))
+      
       if (!res.ok) {
         throw new Error(data?.detail || data?.message || `Failed to load CHA data (${res.status})`)
       }
       if (data?.success === false) {
         throw new Error(data?.message || 'Failed to load CHA data')
       }
-      const rows = normalizeChaRows(data)
-      setChaDataRows(rows)
-      setChaTablePage(1)
-      const metaMonth = data?.sbMonthAndYear ?? null
-      if (metaMonth) {
-        const parsed = parseSbMonthAndYear(metaMonth)
-        if (parsed.monthAbbr) setFilterMonthAbbr(parsed.monthAbbr)
-        if (parsed.year != null) setFilterYear(parsed.year)
+      
+      let rows = normalizeChaRows(data)
+      
+      // Local date range filter based on sbDt
+      if (dateRange && dateRange[0] && dateRange[1]) {
+        rows = rows.filter(r => {
+           if (!r.sbDt) return true
+           const d = dayjs(r.sbDt)
+           if (!d.isValid()) return true
+           return d.isBetween(start.startOf('day'), end.endOf('day'), null, '[]')
+        })
       }
+      
+      // Local Search filter
+      if (params.search) {
+        const s = params.search.toLowerCase()
+        rows = rows.filter(r => Object.values(r).some(v => String(v || '').toLowerCase().includes(s)))
+      }
+      
+      setChaDataRows(rows)
+      
+      const metaMonth = data?.sbMonthAndYear ?? monthStr
       setChaDataMeta({
         sbMonthAndYear: metaMonth,
         gstin: data?.gstin ?? null,
-        count: data?.count ?? rows.length,
+        count: rows.length,
       })
-      if (!rows.length) {
-        message.info('No CHA rows returned for this filter.')
-      }
+      
+      // Pagination
+      const page = params.page || 1
+      const limit = params.limit || 10
+      const pagedRows = rows.slice((page - 1) * limit, page * limit)
+      
+      return { data: pagedRows, meta: { total: rows.length } }
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Failed to load CHA data')
       setChaDataRows([])
       setChaDataMeta(null)
+      return { data: [], meta: { total: 0 } }
     } finally {
       setChaDataLoading(false)
     }
-  }, [BACKEND_URL, filterMonthAbbr, filterYear, filterGstin])
+  }, [BACKEND_URL, dateRange, filterGstin])
 
   const handleStartCurrentMonthProcess = useCallback(async () => {
     if (!BACKEND_URL) {
@@ -336,196 +352,127 @@ export default function CompanyAdminChaPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <div>
-              <Title level={3} style={{ margin: 0 }}>
-                CHA — current month
-              </Title>
-              <Text type="secondary">
-                Run the current-month CHA workflow with or without OTP verification.
-              </Text>
-            </div>
-            <Space direction="vertical" size="small" style={{ width: '100%' }}>
-              <Button
-                type="primary"
-                loading={loadingWithOtp}
-                onClick={handleStartCurrentMonthProcess}
-                disabled={!BACKEND_URL || loadingWithoutOtp}
-              >
-                Start current month process
-              </Button>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Without OTP — optional <Text code>sbMonthAndYear</Text>, <Text code>month</Text>, and{' '}
-                <Text code>sectionIndex</Text> as query parameters.
-              </Text>
-              <Space wrap align="center">
-                <Select
-                  placeholder="Month"
-                  value={processMonthAbbr}
-                  onChange={setProcessMonthAbbr}
-                  options={MONTH_SELECT_OPTIONS}
-                  style={{ width: 100 }}
-                  disabled={loadingWithoutOtp}
-                />
-                <Select
-                  placeholder="Year"
-                  value={processYear}
-                  onChange={setProcessYear}
-                  options={yearOptions}
-                  style={{ width: 100 }}
-                  disabled={loadingWithoutOtp}
-                />
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  Total: {monthYearPeriodTotal} periods · last {YEARS_BACK} years
-                  {composeSbMonthAndYear(processMonthAbbr, processYear) ? (
-                    <>
-                      {' '}
-                      → <Text code>{composeSbMonthAndYear(processMonthAbbr, processYear)}</Text>
-                    </>
-                  ) : null}
-                </Text>
-                <Input
-                  placeholder="sectionIndex (e.g. 0)"
-                  value={processWithoutOtpSectionIndex}
-                  onChange={(e) => setProcessWithoutOtpSectionIndex(e.target.value)}
-                  allowClear
-                  style={{ width: 160 }}
-                  disabled={loadingWithoutOtp}
-                />
-                <Button
-                  loading={loadingWithoutOtp}
-                  onClick={handleStartCurrentMonthProcessWithoutOtp}
-                  disabled={!BACKEND_URL || loadingWithOtp}
-                >
-                  Start current month process (without OTP)
-                </Button>
-              </Space>
-            </Space>
+      {/* 
+      <Space direction="vertical" size="large" style={{ width: '100%', marginBottom: 24 }}>
+        <div>
+          <Title level={3} style={{ margin: 0 }}>
+            CHA — current month
+          </Title>
+          <Text type="secondary">
+            Run the current-month CHA workflow with or without OTP verification.
+          </Text>
+        </div>
+        <Space direction="vertical" size="small" style={{ width: '100%' }}>
+          <Button
+            type="primary"
+            loading={loadingWithOtp}
+            onClick={handleStartCurrentMonthProcess}
+            disabled={!BACKEND_URL || loadingWithoutOtp}
+          >
+            Start current month process
+          </Button>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            Without OTP — optional <Text code>sbMonthAndYear</Text>, <Text code>month</Text>, and{' '}
+            <Text code>sectionIndex</Text> as query parameters.
+          </Text>
+          <Space wrap align="center">
+            <Select
+              placeholder="Month"
+              value={processMonthAbbr}
+              onChange={setProcessMonthAbbr}
+              options={MONTH_SELECT_OPTIONS}
+              style={{ width: 100 }}
+              disabled={loadingWithoutOtp}
+            />
+            <Select
+              placeholder="Year"
+              value={processYear}
+              onChange={setProcessYear}
+              options={yearOptions}
+              style={{ width: 100 }}
+              disabled={loadingWithoutOtp}
+            />
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Total: {monthYearPeriodTotal} periods · last {YEARS_BACK} years
+              {composeSbMonthAndYear(processMonthAbbr, processYear) ? (
+                <>
+                  {' '}
+                  → <Text code>{composeSbMonthAndYear(processMonthAbbr, processYear)}</Text>
+                </>
+              ) : null}
+            </Text>
+            <Input
+              placeholder="sectionIndex (e.g. 0)"
+              value={processWithoutOtpSectionIndex}
+              onChange={(e) => setProcessWithoutOtpSectionIndex(e.target.value)}
+              allowClear
+              style={{ width: 160 }}
+              disabled={loadingWithoutOtp}
+            />
+            <Button
+              loading={loadingWithoutOtp}
+              onClick={handleStartCurrentMonthProcessWithoutOtp}
+              disabled={!BACKEND_URL || loadingWithOtp}
+            >
+              Start current month process (without OTP)
+            </Button>
+          </Space>
+        </Space>
+      </Space>
+      */}
 
-            <div style={{ width: '100%', minWidth: 0 }}>
-              <Title level={5} style={{ margin: 0, marginBottom: 8 }}>
-                CHA data
-              </Title>
-              <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                GET <Text code>/api/company/admin/cha/get-cha-data</Text> — optional month/year (last{' '}
-                {YEARS_BACK} years) and <Text code>gstin</Text>.
-              </Text>
-              <Space wrap align="center" style={{ marginBottom: 12 }}>
-                <Select
-                  placeholder="Month"
-                  value={filterMonthAbbr}
-                  onChange={setFilterMonthAbbr}
-                  options={MONTH_SELECT_OPTIONS}
-                  allowClear
-                  style={{ width: 100 }}
-                />
-                <Select
-                  placeholder="Year"
-                  value={filterYear}
-                  onChange={setFilterYear}
-                  options={yearOptions}
-                  allowClear
-                  style={{ width: 100 }}
-                />
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  Total: {monthYearPeriodTotal} periods
-                  {composeSbMonthAndYear(filterMonthAbbr, filterYear) ? (
-                    <>
-                      {' '}
-                      → <Text code>{composeSbMonthAndYear(filterMonthAbbr, filterYear)}</Text>
-                    </>
-                  ) : null}
-                </Text>
-                <Input
-                  placeholder="GSTIN (e.g. 24AAFCI0903C1ZB)"
-                  value={filterGstin}
-                  onChange={(e) => setFilterGstin(e.target.value)}
-                  onPressEnter={fetchChaData}
-                  allowClear
-                  style={{ width: 260 }}
-                />
-                <Button type="primary" loading={chaDataLoading} onClick={fetchChaData} disabled={!BACKEND_URL}>
-                  Load CHA data
-                </Button>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={handleExportChaExcel}
-                  disabled={!chaDataRows.length || chaDataLoading || mergingToSales}
-                >
-                  Export to Excel
-                </Button>
-                <Button
-                  loading={mergingToSales}
-                  onClick={handleMergeChaDataToSales}
-                  disabled={!BACKEND_URL || chaDataLoading || mergingToSales}
-                >
-                  Merge CHA data to sales
-                </Button>
-                <Button
-                  onClick={() => {
-                    setFilterMonthAbbr(undefined)
-                    setFilterYear(undefined)
-                    setFilterGstin('')
-                    setChaDataRows([])
-                    setChaDataMeta(null)
-                    setChaTablePage(1)
-                  }}
-                  disabled={chaDataLoading || mergingToSales}
-                >
-                  Clear
-                </Button>
-              </Space>
-
+      <div style={{ width: '100%', minWidth: 0, display: 'flex', flexDirection: 'column', flex: 1 }}>
               {chaDataMeta ? (
-                <Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
                   Month: <Text code>{chaDataMeta.sbMonthAndYear ?? '—'}</Text>
                   {' · '}
                   GSTIN filter: <Text code>{chaDataMeta.gstin ?? '—'}</Text>
                   {' · '}
                   Count: <Text strong>{chaDataMeta.count ?? chaDataRows.length}</Text>
-                  {chaDataRows.length !== chaDataMeta.count ? (
-                    <>
-                      {' '}
-                      (showing {chaDataRows.length} row{chaDataRows.length === 1 ? '' : 's'})
-                    </>
-                  ) : null}
                 </Text>
               ) : null}
 
-              <ConfigProvider getPopupContainer={() => document.body}>
-                <div
-                  style={{
-                    width: '100%',
-                    minWidth: 0,
-                    maxWidth: '100%',
-                    overflowX: 'auto',
-                    overflowY: 'visible',
-                  }}
-                >
-                  <Table
-                  size="small"
-                  loading={chaDataLoading}
-                  rowKey={(r, i) => String(r?._id ?? `cha-row-${i}-${r?.sbNo ?? ''}`)}
-                  columns={chaDataColumns}
-                  dataSource={chaDataRows}
-                  pagination={{
-                    current: chaTablePage,
-                    pageSize: chaTablePageSize,
-                    total: chaDataRows.length,
-                    showSizeChanger: true,
-                    pageSizeOptions: [10, 20, 50, 100],
-                    showTotal: (total, range) =>
-                      range[1] ? `${range[0]}-${range[1]} of ${total}` : `${total} rows`,
-                    onChange: handleChaTablePaginationChange,
-                    onShowSizeChange: handleChaTableSizeChange,
-                  }}
-                  scroll={{ x: 'max-content', y: 480 }}
-                  locale={{ emptyText: chaDataLoading ? 'Loading…' : 'Load CHA data to see rows' }}
-                />
-                </div>
-              </ConfigProvider>
+              <ProDataTable
+                columns={chaDataColumns}
+                fetchData={fetchDataForGrid}
+                refreshKey={refreshKey}
+                globalSearchPlaceholder="Search in fetched rows..."
+                rowKey={(r, i) => String(r?._id ?? `cha-row-${i}-${r?.sbNo ?? ''}`)}
+                showSelectionColumn={false}
+                customToolbarActions={
+                  <Space wrap>
+                    <DatePicker.RangePicker 
+                      value={dateRange}
+                      onChange={(dates) => setDateRange(dates)}
+                      style={{ width: 260 }}
+                    />
+                    <Input
+                      placeholder="GSTIN (e.g. 24AAFCI...)"
+                      value={filterGstinInput}
+                      onChange={(e) => setFilterGstinInput(e.target.value)}
+                      onPressEnter={() => {
+                        setFilterGstin(filterGstinInput)
+                        setRefreshKey(prev => prev + 1)
+                      }}
+                      allowClear
+                      style={{ width: 200 }}
+                    />
+                    <Button type="primary" onClick={() => {
+                        setFilterGstin(filterGstinInput)
+                        setRefreshKey(prev => prev + 1)
+                    }} disabled={chaDataLoading}>
+                      Load CHA Data
+                    </Button>
+                    <Button icon={<DownloadOutlined />} onClick={handleExportChaExcel} disabled={!chaDataRows.length || chaDataLoading}>
+                      Export
+                    </Button>
+                    <Button loading={mergingToSales} onClick={handleMergeChaDataToSales} disabled={!chaDataRows.length || chaDataLoading}>
+                      Merge to Sales
+                    </Button>
+                  </Space>
+                }
+              />
             </div>
-          </Space>
         </AppShell>
   )
 }

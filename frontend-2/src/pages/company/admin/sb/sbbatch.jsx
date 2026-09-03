@@ -332,145 +332,145 @@ export default function CompanyAdminSbBatchPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-          <Space direction="vertical" size="large" style={{ width: '100%', minWidth: 0 }}>
-            <div>
-              <Title level={3} style={{ margin: 0 }}>
-                SB Batch Process
-              </Title>
+      <Space direction="vertical" size="large" style={{ width: '100%', minWidth: 0 }}>
+        <div>
+          <Title level={3} style={{ margin: 0 }}>
+            SB Batch Process
+          </Title>
+          <Text type="secondary">
+            Upload an Excel file and process SB scraping in sessions. Then inspect batch history and row-level
+            results.
+          </Text>
+        </div>
+
+        <Card title="Upload + Start Batch">
+          <Space wrap size="middle" align="end">
+            <Space direction="vertical" size={4}>
+              <Text type="secondary">Fetch using</Text>
+              <Select
+                value={fetchUsing}
+                onChange={setFetchUsing}
+                options={FETCH_USING_OPTIONS}
+                style={{ width: 210 }}
+                disabled={uploadLoading}
+              />
+            </Space>
+            <Upload
+              beforeUpload={(file) => {
+                const lower = String(file.name || '').toLowerCase()
+                const ok = lower.endsWith('.xlsx') || lower.endsWith('.xls')
+                if (!ok) {
+                  message.error('Only Excel file is allowed (.xlsx/.xls)')
+                  return Upload.LIST_IGNORE
+                }
+                setFileList([file])
+                return false
+              }}
+              onRemove={() => {
+                setFileList([])
+              }}
+              fileList={fileList}
+              maxCount={1}
+            >
+              <Button icon={<UploadOutlined />}>Choose Excel</Button>
+            </Upload>
+
+            <Button type="primary" loading={uploadLoading} onClick={onStartBatch}>
+              Start Batch
+            </Button>
+          </Space>
+
+          {uploadSummary ? (
+            <div style={{ marginTop: 12 }}>
+              <Text>
+                Batch: <Text code>{String(uploadSummary.uploadBatchId || uploadSummary.batchId || '—')}</Text>
+              </Text>
+              <br />
               <Text type="secondary">
-                Upload an Excel file and process SB scraping in sessions. Then inspect batch history and row-level
-                results.
+                Parsed: {uploadSummary.totalParsedRows ?? '—'} | To scrape: {uploadSummary.toScrape ?? '—'} |
+                Success: {uploadSummary.succeeded ?? '—'} | Failed: {uploadSummary.failed ?? '—'} | Skipped:{' '}
+                {uploadSummary.skippedValidation ?? '—'}
               </Text>
             </div>
+          ) : null}
+        </Card>
 
-            <Card title="Upload + Start Batch">
-              <Space wrap size="middle" align="end">
-                <Space direction="vertical" size={4}>
-                  <Text type="secondary">Fetch using</Text>
-                  <Select
-                    value={fetchUsing}
-                    onChange={setFetchUsing}
-                    options={FETCH_USING_OPTIONS}
-                    style={{ width: 210 }}
-                    disabled={uploadLoading}
-                  />
-                </Space>
-                <Upload
-                  beforeUpload={(file) => {
-                    const lower = String(file.name || '').toLowerCase()
-                    const ok = lower.endsWith('.xlsx') || lower.endsWith('.xls')
-                    if (!ok) {
-                      message.error('Only Excel file is allowed (.xlsx/.xls)')
-                      return Upload.LIST_IGNORE
-                    }
-                    setFileList([file])
-                    return false
-                  }}
-                  onRemove={() => {
-                    setFileList([])
-                  }}
-                  fileList={fileList}
-                  maxCount={1}
-                >
-                  <Button icon={<UploadOutlined />}>Choose Excel</Button>
-                </Upload>
+        <Card
+          title="Batch History"
+          extra={
+            <Button icon={<ReloadOutlined />} onClick={fetchBatches} loading={batchesLoading}>
+              Refresh
+            </Button>
+          }
+        >
+          <div style={{ width: '100%', minWidth: 0, overflowX: 'auto' }}>
+            <Table
+              size="small"
+              style={{ width: '100%', minWidth: 0 }}
+              rowKey={(r) => String(r?.batchId ?? r?.id ?? '')}
+              loading={batchesLoading}
+              columns={batchColumns}
+              dataSource={batches}
+              pagination={{ pageSize: 10, showSizeChanger: true }}
+              scroll={{ x: 'max-content' }}
+            />
+          </div>
+        </Card>
 
-                <Button type="primary" loading={uploadLoading} onClick={onStartBatch}>
-                  Start Batch
-                </Button>
-              </Space>
-
-              {uploadSummary ? (
-                <div style={{ marginTop: 12 }}>
-                  <Text>
-                    Batch: <Text code>{String(uploadSummary.uploadBatchId || uploadSummary.batchId || '—')}</Text>
-                  </Text>
-                  <br />
-                  <Text type="secondary">
-                    Parsed: {uploadSummary.totalParsedRows ?? '—'} | To scrape: {uploadSummary.toScrape ?? '—'} |
-                    Success: {uploadSummary.succeeded ?? '—'} | Failed: {uploadSummary.failed ?? '—'} | Skipped:{' '}
-                    {uploadSummary.skippedValidation ?? '—'}
-                  </Text>
-                </div>
-              ) : null}
-            </Card>
-
-            <Card
-              title="Batch History"
-              extra={
-                <Button icon={<ReloadOutlined />} onClick={fetchBatches} loading={batchesLoading}>
-                  Refresh
-                </Button>
-              }
-            >
-              <div style={{ width: '100%', minWidth: 0, overflowX: 'auto' }}>
-                <Table
-                  size="small"
-                  style={{ width: '100%', minWidth: 0 }}
-                  rowKey={(r) => String(r?.batchId ?? r?.id ?? '')}
-                  loading={batchesLoading}
-                  columns={batchColumns}
-                  dataSource={batches}
-                  pagination={{ pageSize: 10, showSizeChanger: true }}
-                  scroll={{ x: 'max-content' }}
-                />
-              </div>
-            </Card>
-
-            <Card
-              title="Batch Detail Rows"
-              extra={
-                <Space>
-                  <Button
-                    icon={<ReloadOutlined />}
-                    onClick={() => selectedBatchId && fetchBatchDetail(selectedBatchId)}
-                    disabled={!selectedBatchId}
-                    loading={detailLoading}
-                  >
-                    Refresh
-                  </Button>
-                </Space>
-              }
-            >
-              <Text type="secondary">
-                Selected batch:{' '}
-                <Text code>{selectedBatchId || batchDetail?.batchId || batchDetail?.data?.batchId || '—'}</Text>
-              </Text>
-              <div style={{ marginTop: 8 }}>
-                <Space wrap>
-                  <Tag>Success: {successRows.length}</Tag>
-                  <Tag color="error">Error: {errorRows.length}</Tag>
-                </Space>
-              </div>
-              <div style={{ width: '100%', minWidth: 0, overflowX: 'auto', marginTop: 10 }}>
-                <Text strong>Success rows ({successRows.length})</Text>
-                <Table
-                  size="small"
-                  style={{ width: '100%', minWidth: 0, marginTop: 8 }}
-                  rowKey={(r) => String(r?.id ?? `${r?.batchId}-${r?.sheetRowNumber}-${r?.sbNo}`)}
-                  loading={detailLoading}
-                  columns={successDetailColumns}
-                  dataSource={successRows}
-                  pagination={{ pageSize: 20, showSizeChanger: true }}
-                  scroll={{ x: 'max-content' }}
-                  expandable={scrapedExpandable}
-                />
-              </div>
-              <div style={{ width: '100%', minWidth: 0, overflowX: 'auto', marginTop: 16 }}>
-                <Text strong>Error rows ({errorRows.length})</Text>
-                <Table
-                  size="small"
-                  style={{ width: '100%', minWidth: 0, marginTop: 8 }}
-                  rowKey={(r) => String(r?.id ?? `err-${r?.batchId}-${r?.sheetRowNumber}-${r?.sbNo}`)}
-                  loading={detailLoading}
-                  columns={errorDetailColumns}
-                  dataSource={errorRows}
-                  pagination={{ pageSize: 20, showSizeChanger: true }}
-                  scroll={{ x: 'max-content' }}
-                />
-              </div>
-            </Card>
-          </Space>
-        </AppShell>
+        <Card
+          title="Batch Detail Rows"
+          extra={
+            <Space>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={() => selectedBatchId && fetchBatchDetail(selectedBatchId)}
+                disabled={!selectedBatchId}
+                loading={detailLoading}
+              >
+                Refresh
+              </Button>
+            </Space>
+          }
+        >
+          <Text type="secondary">
+            Selected batch:{' '}
+            <Text code>{selectedBatchId || batchDetail?.batchId || batchDetail?.data?.batchId || '—'}</Text>
+          </Text>
+          <div style={{ marginTop: 8 }}>
+            <Space wrap>
+              <Tag>Success: {successRows.length}</Tag>
+              <Tag color="error">Error: {errorRows.length}</Tag>
+            </Space>
+          </div>
+          <div style={{ width: '100%', minWidth: 0, overflowX: 'auto', marginTop: 10 }}>
+            <Text strong>Success rows ({successRows.length})</Text>
+            <Table
+              size="small"
+              style={{ width: '100%', minWidth: 0, marginTop: 8 }}
+              rowKey={(r) => String(r?.id ?? `${r?.batchId}-${r?.sheetRowNumber}-${r?.sbNo}`)}
+              loading={detailLoading}
+              columns={successDetailColumns}
+              dataSource={successRows}
+              pagination={{ pageSize: 20, showSizeChanger: true }}
+              scroll={{ x: 'max-content' }}
+              expandable={scrapedExpandable}
+            />
+          </div>
+          <div style={{ width: '100%', minWidth: 0, overflowX: 'auto', marginTop: 16 }}>
+            <Text strong>Error rows ({errorRows.length})</Text>
+            <Table
+              size="small"
+              style={{ width: '100%', minWidth: 0, marginTop: 8 }}
+              rowKey={(r) => String(r?.id ?? `err-${r?.batchId}-${r?.sheetRowNumber}-${r?.sbNo}`)}
+              loading={detailLoading}
+              columns={errorDetailColumns}
+              dataSource={errorRows}
+              pagination={{ pageSize: 20, showSizeChanger: true }}
+              scroll={{ x: 'max-content' }}
+            />
+          </div>
+        </Card>
+      </Space>
+    </AppShell>
   )
 }

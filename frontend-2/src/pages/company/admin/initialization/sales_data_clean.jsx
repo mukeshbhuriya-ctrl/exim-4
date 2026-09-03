@@ -1,12 +1,12 @@
-import { InboxOutlined } from '@ant-design/icons'
-import { Button, Checkbox, InputNumber, Select, Space, Table, Typography, Upload, message } from 'antd'
+import { InboxOutlined, FileExcelOutlined, CloudUploadOutlined, SaveOutlined, ReloadOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons'
+import { Button, Checkbox, InputNumber, Select, Space, Table, Typography, Upload, Input, message } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
 
-const { Text } = Typography
+const { Title, Text } = Typography
 const { Dragger } = Upload
 
 const TYPE_OPTIONS = [
@@ -107,7 +107,6 @@ function formatDateDdMmYyyy(date) {
   return `${pad2(date.getDate())}-${pad2(date.getMonth() + 1)}-${date.getFullYear()}`
 }
 
-/** Parse Excel / string / Date values into a Date (supports common sales file formats). */
 function parseValueToDate(value) {
   if (value === null || value === undefined || value === '') return null
 
@@ -360,16 +359,18 @@ export default function CompanyAdminSalesDataCleanPage() {
   const [loadingSaved, setLoadingSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [configExists, setConfigExists] = useState(false)
+  const [currentView, setCurrentView] = useState('list')
+  const [searchTerm, setSearchTerm] = useState('')
 
   const handleTypeChange = useCallback((key, nextType) => {
     setRows((prev) =>
       prev.map((row) =>
         row.key === key
           ? {
-              ...row,
-              type: nextType,
-              sampleDisplay: formatSampleValue(row.sampleValue, nextType),
-            }
+            ...row,
+            type: nextType,
+            sampleDisplay: formatSampleValue(row.sampleValue, nextType),
+          }
           : row,
       ),
     )
@@ -604,7 +605,7 @@ export default function CompanyAdminSalesDataCleanPage() {
             setConfigExists(Boolean(data.exists))
           }
         } catch {
-          // ignore — preview still works without saved merge
+          // ignore
         }
       }
 
@@ -612,6 +613,7 @@ export default function CompanyAdminSalesDataCleanPage() {
       setFileName(file.name)
       setSheetName(result.sheetName)
       setRows(mergedRows)
+      setCurrentView('list')
       message.success(
         `Loaded ${mergedRows.length} column(s) from "${result.sheetName}" (row 2 used for type detection).`,
       )
@@ -629,55 +631,151 @@ export default function CompanyAdminSalesDataCleanPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
+      <style>{`
+        .pro-table-antd .ant-table-thead > tr > th {
+          background-color: #f8fafc !important;
+          color: #64748b !important;
+          font-weight: 600 !important;
+          font-size: 11px !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.5px !important;
+          border-bottom: 1px solid var(--exim-border-light) !important;
+        }
+        .pro-table-antd .ant-table-tbody > tr.pro-table-row > td {
+          font-size: 13px !important;
+          color: var(--exim-gray-700) !important;
+          border-bottom: 1px solid var(--exim-border-light) !important;
+          transition: background-color 0.2s ease;
+        }
+        .pro-table-antd .ant-table-tbody > tr.pro-table-row:hover > td {
+          background-color: #f8fafc !important;
+        }
+      `}</style>
       <PageHeader
-        title="Sales Data Clean"
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{
+              width: 44, height: 44,
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, var(--exim-primary) 0%, #60a5fa 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff',
+              boxShadow: '0 4px 14px rgba(59, 130, 246, 0.25)',
+              border: '1px solid rgba(255,255,255,0.2)'
+            }}>
+              <FileExcelOutlined style={{ fontSize: 22 }} />
+            </div>
+            <span style={{ letterSpacing: '-0.5px' }}>Sales Data Clean</span>
+          </div>
+        }
         description="Upload a sales Excel file. Date columns convert to DD-MM-YYYY (e.g. 03-07-2026). Row 2 is used for preview."
         actions={
-          <Space wrap>
-            <Button onClick={fetchSavedConfig} loading={loadingSaved} disabled={!BACKEND_URL}>
-              Reload saved
+          currentView === 'upload' ? (
+            <Button onClick={() => setCurrentView('list')} style={{ fontWeight: 500 }}>
+              Cancel & Back to Rules
             </Button>
-            <Button type="primary" onClick={handleSave} loading={saving} disabled={!rows.length || !BACKEND_URL}>
-              {configExists ? 'Update rules' : 'Save rules'}
-            </Button>
-          </Space>
+          ) : (
+            <Space size={16} split={<div style={{ width: 1, height: 24, background: 'var(--exim-border-light)' }} />}>
+              <Button onClick={fetchSavedConfig} loading={loadingSaved} disabled={!BACKEND_URL}>
+                Reload Saved
+              </Button>
+              <Button
+                type="primary"
+                onClick={handleSave}
+                loading={saving}
+                disabled={!rows.length || !BACKEND_URL}
+              >
+                {configExists ? 'Update Rules' : 'Save Rules'}
+              </Button>
+              <Button
+                onClick={() => setCurrentView('upload')}
+              >
+                Upload Excel
+              </Button>
+            </Space>
+          )
         }
       />
 
-      <Dragger
-        accept=".xlsx,.xls,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-        multiple={false}
-        showUploadList={false}
-        disabled={parsing}
-        beforeUpload={handleBeforeUpload}
-        style={{ marginBottom: 24 }}
-      >
-        <p className="ant-upload-drag-icon">
-          <InboxOutlined />
-        </p>
-        <p className="ant-upload-text">Click or drag sales Excel file here</p>
-        <p className="ant-upload-hint">First row = headers, second row = sample for type detection</p>
-      </Dragger>
+      <div style={{ padding: 0, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        {currentView === 'upload' ? (
+          <div style={{ background: '#fff', border: '1px solid var(--exim-border-light)', padding: 32, borderRadius: 8, flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <Title level={4} style={{ marginTop: 0, marginBottom: 8, color: 'var(--exim-gray-800)' }}>
+              Upload Sales Excel
+            </Title>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>
+              Upload a sample Excel file to parse the headers and configure the data cleaning rules.
+            </Text>
 
-      {fileName ? (
-        <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-          File: {fileName}
-          {sheetName ? ` · Sheet: ${sheetName}` : ''}
-        </Text>
-      ) : null}
+            <Dragger
+              accept=".xlsx,.xls,.xlsm,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+              multiple={false}
+              showUploadList={false}
+              disabled={parsing}
+              beforeUpload={handleBeforeUpload}
+              style={{ padding: '40px 16px', background: '#f8fafc', borderColor: '#cbd5e1' }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+                <CloudUploadOutlined style={{ fontSize: 48, color: 'var(--exim-primary)' }} />
+                <div style={{ textAlign: 'center' }}>
+                  <p className="ant-upload-text" style={{ fontSize: 16, fontWeight: 500, color: 'var(--exim-gray-800)', margin: 0 }}>
+                    Click or drag sales Excel file here
+                  </p>
+                  <p className="ant-upload-hint" style={{ fontSize: 13, color: 'var(--exim-gray-500)', marginTop: 8, marginBottom: 0 }}>
+                    First row = headers, second row = sample for type detection
+                  </p>
+                </div>
+              </div>
+            </Dragger>
+          </div>
+        ) : (
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {fileName ? (
+              <Text type="secondary" style={{ display: 'block', padding: '0 8px' }}>
+                Active File: <strong>{fileName}</strong>
+                {sheetName ? ` · Sheet: ${sheetName}` : ''}
+              </Text>
+            ) : null}
 
-      <Table
-        rowKey="key"
-        columns={columns}
-        dataSource={rows}
-        loading={parsing || loadingSaved}
-        pagination={false}
-        size="small"
-        scroll={{ x: 'max-content', y: 520 }}
-        locale={{
-          emptyText: 'Upload a sales Excel file to preview column headers and types.',
-        }}
-      />
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, width: '100%', background: '#fff', border: '1px solid var(--exim-border-light)', borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '12px 16px', borderBottom: '1px solid var(--exim-border-light)' }}>
+                  <div style={{ position: 'relative', flex: 1, maxWidth: 320 }}>
+                    <Input
+                      prefix={<SearchOutlined style={{ color: 'var(--exim-gray-400)' }} />}
+                      placeholder="Search Rules..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      style={{ borderRadius: 6, height: 36, fontSize: 12 }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Button icon={<SettingOutlined />} style={{ color: 'var(--exim-gray-600)', borderColor: 'var(--exim-border)', width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center' }} />
+                  </div>
+                </div>
+
+                <div className="pro-table-antd-container" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', flex: 1 }}>
+                  <Table
+                    rowKey="key"
+                    columns={columns}
+                    dataSource={(() => {
+                      const lower = searchTerm.toLowerCase()
+                      return lower ? rows.filter(r => r.header?.toLowerCase().includes(lower)) : rows
+                    })()}
+                    loading={parsing || loadingSaved}
+                    pagination={false}
+                    size="small"
+                    scroll={{ x: 'max-content', y: 'calc(100vh - 350px)' }}
+                    className="pro-table-antd"
+                    rowClassName="pro-table-row"
+                    locale={{ emptyText: <div style={{ height: 96, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--exim-gray-400)', fontWeight: 500 }}>No records found.</div> }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </AppShell>
   )
 }

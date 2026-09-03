@@ -5,12 +5,13 @@ import {
   InputNumber,
   Layout,
   Modal,
-  Select,
   Space,
   Table,
   Tag,
   Typography,
   message,
+  Drawer,
+  Tabs
 } from 'antd'
 import {
   DownloadOutlined,
@@ -18,12 +19,14 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
+  RightOutlined,
+  DownOutlined
 } from '@ant-design/icons'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
-import PageHeader from '../../../../components/common/PageHeader.jsx'
+import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -205,14 +208,7 @@ function cellText(value) {
   return String(value)
 }
 
-const FETCH_USING_OPTIONS = [
-  { value: 'dricat', label: 'dricat' },
-  { value: 'selenium', label: 'selenium' },
-]
-
-function normalizeFetchUsing(value) {
-  const v = String(value || '').trim().toLowerCase()
-  if (v === 'dricat') return v
+function normalizeFetchUsing() {
   return 'dricat'
 }
 
@@ -452,6 +448,7 @@ export default function CompanyAdminDgftPage() {
 
   const [days, setDays] = useState([])
   const [daysLoading, setDaysLoading] = useState(false)
+  const [refreshDaysKey, setRefreshDaysKey] = useState(0)
   const [selectedDayKey, setSelectedDayKey] = useState(null)
 
   const [records, setRecords] = useState([])
@@ -558,6 +555,25 @@ export default function CompanyAdminDgftPage() {
     }
   }, [BACKEND_URL])
 
+  const fetchDaysGrid = useCallback(async () => {
+    if (!BACKEND_URL) return { data: [], meta: { total: 0 } }
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/company/admin/dgft/process-days`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.detail || data?.message || `Failed to load DGFT days (${res.status})`)
+      const list = normalizeDaysResponse(data).filter((d) => d && typeof d === 'object')
+      setDays(list)
+      return { data: list, meta: { total: list.length } }
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Failed to load DGFT days')
+      setDays([])
+      return { data: [], meta: { total: 0 } }
+    }
+  }, [BACKEND_URL])
+
   const fetchDays = useCallback(async () => {
     if (!BACKEND_URL) return
     setDaysLoading(true)
@@ -572,18 +588,6 @@ export default function CompanyAdminDgftPage() {
       }
       const nextDays = normalizeDaysResponse(data).filter((d) => d && typeof d === 'object')
       setDays(nextDays)
-      setSelectedDayKey((prev) => {
-        if (!nextDays.length) return null
-        const keep = prev && nextDays.some((d) => String(d.dayKey ?? d.id) === String(prev))
-        if (keep) return prev
-        return String(nextDays[0].dayKey ?? nextDays[0].id)
-      })
-      if (!nextDays.length) {
-        setRecords([])
-        setSelectedId(null)
-        setDetail(null)
-        setDetailRows([])
-      }
     } catch (e) {
       message.error(e instanceof Error ? e.message : 'Failed to load DGFT days')
       setDays([])
@@ -692,7 +696,7 @@ export default function CompanyAdminDgftPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sampleSize: size,
-          fetchUsing: normalizeFetchUsing(fetchUsing),
+          fetchUsing: 'dricat',
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -704,7 +708,8 @@ export default function CompanyAdminDgftPage() {
       } else {
         message.success(data?.message || `Random DGFT process completed for ${size} shipping bill(s)`)
       }
-      await Promise.all([fetchDays(), fetchUnfetchedCount()])
+      await fetchUnfetchedCount()
+      setRefreshDaysKey(prev => prev + 1)
       const dayFromResult =
         data?.data?.dayKey || data?.dayKey || new Date().toISOString().slice(0, 10)
       if (dayFromResult) setSelectedDayKey(String(dayFromResult))
@@ -716,9 +721,10 @@ export default function CompanyAdminDgftPage() {
   }, [BACKEND_URL, sampleSize, fetchDays, fetchUnfetchedCount, fetchUsing])
 
   const refreshDaysAndCount = useCallback(async () => {
-    await Promise.all([fetchDays(), fetchUnfetchedCount()])
+    await fetchUnfetchedCount()
+    setRefreshDaysKey(prev => prev + 1)
     if (selectedDayKey) await fetchDayDetail(selectedDayKey)
-  }, [fetchDays, fetchUnfetchedCount, selectedDayKey, fetchDayDetail])
+  }, [fetchUnfetchedCount, selectedDayKey, fetchDayDetail])
 
   const handleExportCurrent = useCallback(() => {
     const rec = records.find((r) => String(r?.id) === String(selectedId))
@@ -801,7 +807,6 @@ export default function CompanyAdminDgftPage() {
         title: 'Day',
         dataIndex: 'dayKey',
         key: 'day',
-        width: 120,
         ellipsis: true,
         render: (_, record) => String(record?.dayKey ?? record?.id ?? '—'),
       },
@@ -809,7 +814,6 @@ export default function CompanyAdminDgftPage() {
         title: 'Total',
         dataIndex: 'totalRows',
         key: 'totalRows',
-        width: 80,
         align: 'right',
         render: (v) => (v == null ? '—' : String(v)),
       },
@@ -817,7 +821,6 @@ export default function CompanyAdminDgftPage() {
         title: 'Success',
         dataIndex: 'processedSuccess',
         key: 'processedSuccess',
-        width: 90,
         align: 'right',
         render: (v) => (v == null ? '—' : String(v)),
       },
@@ -825,7 +828,6 @@ export default function CompanyAdminDgftPage() {
         title: 'Error',
         dataIndex: 'processedError',
         key: 'processedError',
-        width: 90,
         align: 'right',
         render: (v) => (v == null ? '—' : String(v)),
       },
@@ -833,7 +835,6 @@ export default function CompanyAdminDgftPage() {
         title: 'No data',
         dataIndex: 'noDataCount',
         key: 'noDataCount',
-        width: 90,
         align: 'right',
         render: (v, record) => String(v ?? record?.skipped ?? '—'),
       },
@@ -841,14 +842,12 @@ export default function CompanyAdminDgftPage() {
         title: 'Batches',
         dataIndex: 'batchCount',
         key: 'batchCount',
-        width: 90,
         align: 'right',
         render: (v) => (v == null ? '—' : String(v)),
       },
       {
         title: '',
         key: 'view',
-        width: 88,
         render: (_, record) => {
           const key = record?.dayKey ?? record?.id
           return (
@@ -980,16 +979,12 @@ export default function CompanyAdminDgftPage() {
       rowExpandable: (record) => hasBrcDetail(record),
       expandIcon: ({ expanded, onExpand, record }) => {
         if (!hasBrcDetail(record)) {
-          return <span style={{ display: 'inline-block', width: 17 }} aria-hidden />
+          return <span style={{ display: 'inline-block', width: 24 }} aria-hidden />
         }
-        return (
-          <Button
-            type="text"
-            size="small"
-            aria-label={expanded ? 'Collapse BRC detail' : 'Expand BRC detail'}
-            icon={expanded ? <MinusOutlined /> : <PlusOutlined />}
-            onClick={(e) => onExpand(record, e)}
-          />
+        return expanded ? (
+          <DownOutlined style={{ fontSize: 12, cursor: 'pointer', color: 'var(--exim-gray-600)', margin: '0 8px' }} onClick={e => onExpand(record, e)} />
+        ) : (
+          <RightOutlined style={{ fontSize: 12, cursor: 'pointer', color: 'var(--exim-gray-600)', margin: '0 8px' }} onClick={e => onExpand(record, e)} />
         )
       },
     }),
@@ -1002,106 +997,33 @@ export default function CompanyAdminDgftPage() {
             <div
               style={{
                 display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'space-between',
-                alignItems: 'flex-start',
-                gap: 12,
+                padding: '12px 16px',
+                background:
+                  unfetchedCount?.filterDgftSbNoNotFetchedUnique > 0 || unfetchedCount?.filterDgftSbNofetchederrorUnique > 0
+                    ? '#fffbe6'
+                    : '#f6ffed',
+                border: `1px solid ${
+                  unfetchedCount?.filterDgftSbNoNotFetchedUnique > 0 || unfetchedCount?.filterDgftSbNofetchederrorUnique > 0
+                    ? '#ffe58f'
+                    : '#b7eb8f'
+                }`,
+                borderRadius: 8,
                 flexWrap: 'wrap',
+                gap: 16
               }}
             >
-              <div style={{ minWidth: 0 }}>
-                <Title level={3} style={{ margin: 0 }}>
-                  DGFT Process Records
-                </Title>
-                <Text type="secondary">
-                  Browse DGFT runs day-wise (like Shipping Bill), then open a record to inspect scraped
-                  table rows.
+              <div>
+                <Title level={5} style={{ margin: 0 }}>DGFT Process Records</Title>
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  Browse DGFT runs day-wise, then open a record to inspect scraped table rows.
+                  {unfetchedCount?.collections?.length ? ` · Sources: ${unfetchedCount.collections.join(', ')}` : ''}
+                  {unfetchedCount?.message ? ` — ${unfetchedCount.message}` : ''}
                 </Text>
-                {unfetchedCount?.collections?.length ? (
-                  <Text type="secondary" style={{ display: 'block', marginTop: 4 }}>
-                    PDF registry vs successful fetches in {unfetchedCount.collections.join(', ')}
-                  </Text>
-                ) : null}
               </div>
-              <Space wrap>
-                <Space align="center" size={8}>
-                  <Text type="secondary">Sample size:</Text>
-                  <InputNumber
-                    min={1}
-                    max={100}
-                    value={sampleSize}
-                    onChange={(value) => setSampleSize(value ?? 10)}
-                    style={{ width: 88 }}
-                    disabled={daysLoading || recordsLoading || submittingRandomTen}
-                  />
-                </Space>
-                <Space align="center" size={8}>
-                  <Text type="secondary">Fetch using:</Text>
-                  <Select
-                    value={fetchUsing}
-                    onChange={setFetchUsing}
-                    options={FETCH_USING_OPTIONS}
-                    style={{ width: 180 }}
-                    disabled={daysLoading || recordsLoading || submittingRandomTen}
-                  />
-                </Space>
-                <Button
-                  type="primary"
-                  onClick={handleProcessRandomTen}
-                  loading={submittingRandomTen}
-                  disabled={!BACKEND_URL || daysLoading || recordsLoading}
-                >
-                  Process random batch
-                </Button>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={handleExportAll}
-                  loading={exportingAll}
-                  disabled={
-                    !BACKEND_URL ||
-                    daysLoading ||
-                    recordsLoading ||
-                    submittingRandomTen ||
-                    !filteredRecords.length
-                  }
-                >
-                  Export day to Excel
-                </Button>
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={refreshDaysAndCount}
-                  loading={daysLoading || recordsLoading || unfetchedCountLoading}
-                  disabled={
-                    !BACKEND_URL ||
-                    daysLoading ||
-                    recordsLoading ||
-                    unfetchedCountLoading ||
-                    submittingRandomTen ||
-                    exportingAll
-                  }
-                >
-                  Refresh days
-                </Button>
-              </Space>
-            </div>
 
-            {unfetchedCount || unfetchedCountLoading ? (
-              <div
-                style={{
-                  padding: '12px 16px',
-                  background:
-                    unfetchedCount?.filterDgftSbNoNotFetchedUnique > 0 ||
-                    unfetchedCount?.filterDgftSbNofetchederrorUnique > 0
-                      ? '#fffbe6'
-                      : '#f6ffed',
-                  border: `1px solid ${
-                    unfetchedCount?.filterDgftSbNoNotFetchedUnique > 0 ||
-                    unfetchedCount?.filterDgftSbNofetchederrorUnique > 0
-                      ? '#ffe58f'
-                      : '#b7eb8f'
-                  }`,
-                  borderRadius: 8,
-                }}
-              >
+              {(unfetchedCount || unfetchedCountLoading) && (
                 <Space wrap size={[8, 8]}>
                   <Tag>Total SB No: {unfetchedCount?.totalShippingBillNoUnique ?? '—'}</Tag>
                   <Tag color="green">
@@ -1116,174 +1038,194 @@ export default function CompanyAdminDgftPage() {
                   <Tag color={unfetchedCount?.filterDgftSbNofetchederrorUnique > 0 ? 'orange' : 'green'}>
                     Filter DGFT SB No fetched error: {unfetchedCount?.filterDgftSbNofetchederrorUnique ?? '—'}
                   </Tag>
-                  {unfetchedCountLoading ? <Text type="secondary">Updating…</Text> : null}
+                  {unfetchedCountLoading ? <Text type="secondary" style={{ fontSize: 12 }}>Updating…</Text> : null}
                 </Space>
-                {unfetchedCount?.message ? (
-                  <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-                    {unfetchedCount.message}
-                  </Text>
-                ) : null}
-              </div>
-            ) : null}
-
-            <div style={{ minWidth: 0, maxWidth: '100%' }}>
-              <Title level={5} style={{ marginTop: 0 }}>
-                Search SB No (all company records)
-              </Title>
-              <Space wrap align="center" style={{ marginBottom: 16 }}>
-                <Input.TextArea
-                  placeholder="Enter one or more SB Nos (comma / space / newline separated)"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  onPressEnter={(e) => {
-                    if (!e.shiftKey) {
-                      e.preventDefault()
-                      applySearch()
-                    }
-                  }}
-                  autoSize={{ minRows: 1, maxRows: 3 }}
-                  allowClear
-                  style={{ width: 420, maxWidth: '100%' }}
-                />
-                <Button
-                  type="primary"
-                  icon={<SearchOutlined />}
-                  onClick={applySearch}
-                  loading={searchLoading}
-                  disabled={!BACKEND_URL || searchLoading}
-                >
-                  Search
-                </Button>
-                <Button onClick={clearSearch} disabled={!hasActiveSearch && !searchInput}>
-                  Clear
-                </Button>
-              </Space>
-              {searchMode ? (
-                <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                  Searched {searchedSbNos.length} SB No(s)
-                  {searchedSbNos.length ? (
-                    <>
-                      : <Text code>{searchedSbNos.slice(0, 8).join(', ')}</Text>
-                      {searchedSbNos.length > 8 ? '…' : ''}
-                    </>
-                  ) : null}
-                  {notFoundSbNos.length ? (
-                    <>
-                      {' · '}Not found: <Text code>{notFoundSbNos.slice(0, 8).join(', ')}</Text>
-                      {notFoundSbNos.length > 8 ? '…' : ''}
-                    </>
-                  ) : null}
-                </Text>
-              ) : null}
+              )}
             </div>
 
-            <div style={{ minWidth: 0, maxWidth: '100%', overflowX: 'auto' }}>
-              <Title level={5} style={{ marginTop: 0 }}>
-                Days
-              </Title>
-              <Table
-                rowKey={(r) => String(r?.dayKey ?? r?.id ?? Math.random())}
-                dataSource={days}
+            <div style={{ width: '100%', minWidth: 0 }}>
+              <ProDataTable
                 columns={dayColumns}
-                loading={daysLoading}
-                pagination={{ pageSize: 10 }}
-                scroll={{ x: 720 }}
-                onRow={(record) => ({
-                  onClick: () => {
-                    const key = record?.dayKey ?? record?.id
-                    if (key != null) setSelectedDayKey(String(key))
-                  },
-                  style: { cursor: 'pointer' },
-                })}
-                rowClassName={(record) =>
-                  String(record?.dayKey ?? record?.id) === String(selectedDayKey)
-                    ? 'ant-table-row-selected'
-                    : ''
+                fetchData={fetchDaysGrid}
+                refreshKey={refreshDaysKey}
+                rowKey={(record, index) => dayRowKey(record, index)}
+                globalSearchPlaceholder="Search process days..."
+                showSelectionColumn={false}
+                customToolbarActions={
+                  <Space size={12} align="center">
+                    <Input.Search
+                      placeholder="Search SB No (comma/space separated)"
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      onSearch={applySearch}
+                      enterButton="Search"
+                      loading={searchLoading}
+                      disabled={!BACKEND_URL}
+                      style={{ width: 280 }}
+                      allowClear
+                      onClear={clearSearch}
+                    />
+                    <Button onClick={clearSearch} disabled={!hasActiveSearch && !searchInput}>
+                      Clear Search
+                    </Button>
+                    <Space align="center" size={8}>
+                      <Text type="secondary">Sample size:</Text>
+                      <InputNumber
+                        min={1}
+                        max={100}
+                        value={sampleSize}
+                        onChange={(value) => setSampleSize(value ?? 10)}
+                        style={{ width: 70 }}
+                        disabled={submittingRandomTen}
+                      />
+                    </Space>
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={refreshDaysAndCount}
+                      loading={unfetchedCountLoading}
+                      disabled={!BACKEND_URL || unfetchedCountLoading || submittingRandomTen}
+                    >
+                      Refresh days
+                    </Button>
+                    <Button
+                      type="primary"
+                      onClick={handleProcessRandomTen}
+                      loading={submittingRandomTen}
+                      disabled={!BACKEND_URL || submittingRandomTen}
+                    >
+                      Process random batch
+                    </Button>
+                  </Space>
                 }
-                locale={{ emptyText: daysLoading ? 'Loading…' : 'No DGFT days yet' }}
               />
             </div>
 
-            <div style={{ minWidth: 0, maxWidth: '100%', overflowX: 'auto' }}>
-              <Title level={5} style={{ marginTop: 0 }}>
-                {searchMode
-                  ? `Search results (${filteredRecords.length})`
-                  : `Inputs ${selectedDayKey ? `(${selectedDayKey})` : ''}`}
-              </Title>
-              <Table
-                rowKey={(r) => String(r?.id ?? Math.random())}
-                dataSource={filteredRecords}
-                columns={inputColumns}
-                loading={recordsLoading || searchLoading}
-                pagination={{ pageSize: 10 }}
-                scroll={{ x: 980 }}
-                onRow={(record) => ({
-                  onClick: () => setSelectedId(record?.id ?? null),
-                  style: { cursor: 'pointer' },
-                })}
-                rowClassName={(record) =>
-                  String(record?.id) === String(selectedId) ? 'ant-table-row-selected' : ''
-                }
-                locale={{
-                  emptyText: searchMode
-                    ? searchLoading
-                      ? 'Searching…'
-                      : 'No records match the SB No search'
-                    : !selectedDayKey
-                      ? 'Select a day above or search by SB No'
-                      : recordsLoading
-                        ? 'Loading…'
-                        : 'No records for this day',
-                }}
-              />
-            </div>
+            <Drawer
+              title={
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: 16, fontWeight: 600 }}>
+                    {searchMode ? 'Search Results' : `Process Day Detail`}
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--exim-gray-500)', marginTop: 4 }}>
+                    {searchMode ? (
+                      <>
+                        Searched {searchedSbNos.length} SB No(s)
+                        {notFoundSbNos.length ? ` · Not found: ${notFoundSbNos.slice(0, 5).join(', ')}${notFoundSbNos.length > 5 ? '…' : ''}` : ''}
+                      </>
+                    ) : (
+                      `Date Key: ${selectedDayKey}`
+                    )}
+                  </span>
+                </div>
+              }
+              placement="right"
+              width="90%"
+              onClose={() => {
+                if (searchMode) clearSearch()
+                else setSelectedDayKey(null)
+                setSelectedId(null)
+              }}
+              open={!!selectedDayKey || searchMode}
+              extra={
+                <Space>
+                  <Button
+                    icon={<DownloadOutlined />}
+                    onClick={handleExportAll}
+                    loading={exportingAll}
+                    disabled={!BACKEND_URL || searchLoading || recordsLoading || !filteredRecords.length}
+                  >
+                    Export All to Excel
+                  </Button>
+                </Space>
+              }
+              styles={{
+                header: { padding: '16px 24px', borderBottom: '1px solid var(--exim-border-light)' },
+                body: { padding: '0px', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--exim-gray-50)' },
+              }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                <div style={{ flex: selectedId ? '0 0 45%' : '1 1 auto', padding: 24, overflowY: 'auto', borderBottom: selectedId ? '1px solid var(--exim-border-light)' : 'none' }}>
+                  <Title level={5} style={{ marginTop: 0, marginBottom: 16 }}>
+                    Inputs ({filteredRecords.length})
+                  </Title>
+                  <div style={{ 
+                    background: 'white', 
+                    padding: 16, 
+                    borderRadius: 8, 
+                    border: '1px solid var(--exim-border-light)',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                  }}>
+                    <Table
+                      size="small"
+                      rowKey={(r) => String(r?.id ?? Math.random())}
+                      dataSource={filteredRecords}
+                      columns={inputColumns}
+                      loading={recordsLoading || searchLoading}
+                      pagination={{ pageSize: 15 }}
+                      scroll={{ x: 'max-content', y: selectedId ? 'calc(45vh - 180px)' : 'calc(100vh - 220px)' }}
+                      onRow={(record) => ({
+                        onClick: () => setSelectedId(record?.id ?? null),
+                        style: { cursor: 'pointer' },
+                      })}
+                      rowClassName={(record) => String(record?.id) === String(selectedId) ? 'ant-table-row-selected' : ''}
+                      locale={{ emptyText: 'No input records found.' }}
+                      className="custom-table"
+                    />
+                  </div>
+                </div>
 
-            <div style={{ minWidth: 0, maxWidth: '100%', overflowX: 'auto' }}>
-              <Space
-                align="center"
-                wrap
-                style={{ width: '100%', justifyContent: 'space-between', marginTop: 0 }}
-              >
-                <Title level={5} style={{ margin: 0 }}>
-                  Table Rows {selectedId ? `(Record ${selectedId})` : ''}
-                </Title>
-                <Button
-                  type="primary"
-                  icon={<DownloadOutlined />}
-                  onClick={handleExportCurrent}
-                  disabled={!selectedId || detailLoading || !detailRows.length || exportingAll}
-                >
-                  Export to Excel
-                </Button>
-              </Space>
-              <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                {detail ? (
-                  <Text type="secondary">
-                    Status: <Tag color={statusColor(detail?.status)}>{String(detail?.status || 'unknown')}</Tag>{' '}
-                    Batch: {String(detail?.batchId ?? '—')} | Day: {String(detail?.dayKey ?? '—')}
-                  </Text>
-                ) : null}
-                <Table
-                  rowKey={(row, idx) => {
-                    const bn = row?.['Bank Realisation Number']
-                    const bill = row?.['Bill ID']
-                    if (bn && bill) return `${bn}:${bill}:${idx}`
-                    if (row?.id != null) return String(row.id)
-                    return `dgft-tr-${idx}`
-                  }}
-                  dataSource={detailRows}
-                  columns={detailColumns}
-                  loading={detailLoading}
-                  pagination={{ pageSize: 20 }}
-                  scroll={{ x: Math.max(900, detailColumns.length * 160) }}
-                  expandable={tableExpandable}
-                  locale={{ emptyText: selectedId ? 'No table rows found.' : 'Select a record above.' }}
-                />
-              </Space>
-            </div>
+                {selectedId && (
+                  <div style={{ flex: '1 1 55%', padding: 24, overflowY: 'auto', backgroundColor: '#fff' }}>
+                    <Space align="center" wrap style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
+                      <Title level={5} style={{ margin: 0 }}>
+                        Table Rows Details
+                        {detail ? <span style={{ fontSize: 13, fontWeight: 'normal', color: 'var(--exim-gray-500)', marginLeft: 12 }}>
+                          (Status: <Tag color={statusColor(detail?.status)} style={{ margin: '0 4px' }}>{String(detail?.status || 'unknown')}</Tag>
+                          Batch: {String(detail?.batchId ?? '—')})
+                        </span> : null}
+                      </Title>
+                      <Button
+                        type="primary"
+                        icon={<DownloadOutlined />}
+                        onClick={handleExportCurrent}
+                        disabled={!selectedId || detailLoading || !detailRows.length || exportingAll}
+                      >
+                        Export Rows
+                      </Button>
+                    </Space>
+                    
+                    <div style={{ 
+                      background: 'white', 
+                      padding: 16, 
+                      borderRadius: 8, 
+                      border: '1px solid var(--exim-border-light)',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
+                    }}>
+                      <Table
+                        size="small"
+                        rowKey={(row, idx) => {
+                          const bn = row?.['Bank Realisation Number']
+                          const bill = row?.['Bill ID']
+                          if (bn && bill) return `${bn}:${bill}:${idx}`
+                          if (row?.id != null) return String(row.id)
+                          return `dgft-tr-${idx}`
+                        }}
+                        dataSource={detailRows}
+                        columns={detailColumns}
+                        loading={detailLoading}
+                        pagination={{ pageSize: 20 }}
+                        scroll={{ x: 'max-content', y: 'calc(55vh - 180px)' }}
+                        expandable={tableExpandable}
+                        locale={{ emptyText: 'No table rows found for this input.' }}
+                        className="custom-table"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Drawer>
           </Space>
         
-
       <Modal
         title="PDF preview"
         open={Boolean(pdfModalUrl)}

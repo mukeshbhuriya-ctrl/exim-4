@@ -4,12 +4,25 @@ import {
   PlusOutlined,
   ReloadOutlined,
   SaveOutlined,
+  CloseOutlined,
 } from '@ant-design/icons'
-import { Button, Card, DatePicker, Form, Space, Table, Tag, Typography, message } from 'antd'
+import {
+  Button,
+  DatePicker,
+  Form,
+  Space,
+  Table,
+  Tag,
+  Typography,
+  message,
+  Tabs,
+  Tooltip
+} from 'antd'
 import dayjs from 'dayjs'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import CompanySidebar from '../../../components/company/sidebar.jsx'
 import AppShell from '../../../components/layout/AppShell.jsx'
+import ProDataTable from '../../../components/shared/ProDataTable.jsx'
 import { splitEbrcDateRange } from '../../../utils/ebrcDateRangeSplit.js'
 
 const { Title, Text } = Typography
@@ -76,25 +89,18 @@ function formatStoredAt(value) {
 export default function CompanyAdminStoreBulkDownloadPage() {
   const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '')
 
-  const [dgftRows, setDgftRows] = useState([])
-  const [dgftCount, setDgftCount] = useState(0)
-  const [dgftLoading, setDgftLoading] = useState(false)
-
-  const [storedRows, setStoredRows] = useState([])
-  const [storedTotal, setStoredTotal] = useState(0)
-  const [storedPage, setStoredPage] = useState(1)
-  const [storedPageSize, setStoredPageSize] = useState(20)
-  const [storedLoading, setStoredLoading] = useState(false)
+  const [refreshDgftKey, setRefreshDgftKey] = useState(0)
+  const [refreshStoredKey, setRefreshStoredKey] = useState(0)
 
   const [storingAttachId, setStoringAttachId] = useState(null)
   const [exportingStoredId, setExportingStoredId] = useState(null)
   const [submittingRequest, setSubmittingRequest] = useState(false)
   const [splitChunks, setSplitChunks] = useState([])
+  const [showRequestForm, setShowRequestForm] = useState(false)
   const [submitForm] = Form.useForm()
 
-  const fetchDgftRequests = useCallback(async () => {
-    if (!BACKEND_URL) return
-    setDgftLoading(true)
+  const fetchDgftRequests = useCallback(async (page = 1, pageSize = 20) => {
+    if (!BACKEND_URL) return { data: [], meta: { total: 0 } }
     try {
       const res = await fetch(`${BACKEND_URL}${EBRC_API}`, {
         method: 'GET',
@@ -105,27 +111,23 @@ export default function CompanyAdminStoreBulkDownloadPage() {
         throw new Error(data?.detail || data?.message || `Failed to load eBRC requests (${res.status})`)
       }
       const list = normalizeEbrcRows(data).filter((r) => r && typeof r === 'object')
-      setDgftRows(list)
-      setDgftCount(Number(data?.count) || list.length)
       if (data?.success === false) {
         message.warning(data?.message || 'Request completed with issues')
       }
+      const start = (page - 1) * pageSize
+      return { data: list.slice(start, start + pageSize), meta: { total: list.length } }
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Failed to load DGFT bulk requests')
-      setDgftRows([])
-      setDgftCount(0)
-    } finally {
-      setDgftLoading(false)
+      return { data: [], meta: { total: 0 } }
     }
   }, [BACKEND_URL])
 
-  const fetchStoredAttachments = useCallback(async () => {
-    if (!BACKEND_URL) return
-    setStoredLoading(true)
+  const fetchStoredAttachments = useCallback(async (page = 1, limit = 20) => {
+    if (!BACKEND_URL) return { data: [], meta: { total: 0 } }
     try {
       const qs = new URLSearchParams({
-        page: String(storedPage),
-        limit: String(storedPageSize),
+        page: String(page),
+        limit: String(limit),
       })
       const res = await fetch(`${BACKEND_URL}${STORED_LIST_API}?${qs}`, {
         method: 'GET',
@@ -135,24 +137,15 @@ export default function CompanyAdminStoreBulkDownloadPage() {
       if (!res.ok) {
         throw new Error(data?.detail || data?.message || `Failed to load stored attachments (${res.status})`)
       }
-      setStoredRows(Array.isArray(data.rows) ? data.rows : [])
-      setStoredTotal(typeof data.total === 'number' ? data.total : 0)
+      return {
+        data: Array.isArray(data.rows) ? data.rows : [],
+        meta: { total: typeof data.total === 'number' ? data.total : 0 }
+      }
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Failed to load stored attachments')
-      setStoredRows([])
-      setStoredTotal(0)
-    } finally {
-      setStoredLoading(false)
+      return { data: [], meta: { total: 0 } }
     }
-  }, [BACKEND_URL, storedPage, storedPageSize])
-
-  useEffect(() => {
-    fetchDgftRequests()
-  }, [fetchDgftRequests])
-
-  useEffect(() => {
-    fetchStoredAttachments()
-  }, [fetchStoredAttachments])
+  }, [BACKEND_URL])
 
   const loadSplitPreview = useCallback((from, to) => {
     if (!isValidRange(from, to)) {
@@ -220,7 +213,10 @@ export default function CompanyAdminStoreBulkDownloadPage() {
             `Bulk download request submitted for ${data?.submittedCount ?? splitChunks.length} range(s).`,
         )
       }
-      await fetchDgftRequests()
+      setRefreshDgftKey(prev => prev + 1)
+      submitForm.resetFields()
+      setSplitChunks([])
+      setShowRequestForm(false)
     } catch (err) {
       message.error(err instanceof Error ? err.message : 'Failed to submit bulk download request')
     } finally {
@@ -256,8 +252,7 @@ export default function CompanyAdminStoreBulkDownloadPage() {
           throw new Error(data?.detail || data?.message || `Store failed (${res.status})`)
         }
         message.success(data?.message || `Stored attachment ${attachId}`)
-        setStoredPage(1)
-        await fetchStoredAttachments()
+        setRefreshStoredKey(prev => prev + 1)
       } catch (err) {
         message.error(err instanceof Error ? err.message : 'Failed to store attachment')
       } finally {
@@ -312,21 +307,21 @@ export default function CompanyAdminStoreBulkDownloadPage() {
     [BACKEND_URL],
   )
 
-  const refreshAll = useCallback(async () => {
-    await Promise.all([fetchDgftRequests(), fetchStoredAttachments()])
-  }, [fetchDgftRequests, fetchStoredAttachments])
+  const refreshAll = useCallback(() => {
+    setRefreshDgftKey(prev => prev + 1)
+    setRefreshStoredKey(prev => prev + 1)
+  }, [])
 
   const dgftColumns = useMemo(
     () => [
       { title: 'Sr No', dataIndex: 'srNo', key: 'srNo', width: 72, render: cellText },
-      { title: 'Request Type', dataIndex: 'requestType', key: 'requestType', width: 120, render: cellText },
-      { title: 'From Date', dataIndex: 'fromDate', key: 'fromDate', width: 120, render: cellText },
-      { title: 'To Date', dataIndex: 'toDate', key: 'toDate', width: 120, render: cellText },
+      { title: 'Request Type', dataIndex: 'requestType', key: 'requestType', render: cellText },
+      { title: 'From Date', dataIndex: 'fromDate', key: 'fromDate', render: cellText },
+      { title: 'To Date', dataIndex: 'toDate', key: 'toDate', render: cellText },
       {
         title: 'Status',
         dataIndex: 'status',
         key: 'status',
-        width: 120,
         render: (value) => {
           const text = cellText(value)
           if (text === '—') return text
@@ -337,14 +332,12 @@ export default function CompanyAdminStoreBulkDownloadPage() {
         title: 'Attach ID',
         dataIndex: 'attachId',
         key: 'attachId',
-        width: 130,
         render: (value) => <Text code>{cellText(value)}</Text>,
       },
       {
         title: 'Request Date Time',
         dataIndex: 'requestDateTime',
         key: 'requestDateTime',
-        width: 180,
         ellipsis: true,
         render: cellText,
       },
@@ -381,7 +374,6 @@ export default function CompanyAdminStoreBulkDownloadPage() {
         title: 'Stored ID',
         dataIndex: 'id',
         key: 'id',
-        width: 220,
         ellipsis: true,
         render: (v) => <Text code>{cellText(v)}</Text>,
       },
@@ -389,17 +381,15 @@ export default function CompanyAdminStoreBulkDownloadPage() {
         title: 'Attach ID',
         dataIndex: 'attachId',
         key: 'attachId',
-        width: 130,
         render: (v) => <Text code>{cellText(v)}</Text>,
       },
-      { title: 'From Date', dataIndex: 'fromDate', key: 'fromDate', width: 120, render: cellText },
-      { title: 'To Date', dataIndex: 'toDate', key: 'toDate', width: 120, render: cellText },
-      { title: 'File', dataIndex: 'fileName', key: 'fileName', width: 180, ellipsis: true, render: cellText },
+      { title: 'From Date', dataIndex: 'fromDate', key: 'fromDate', render: cellText },
+      { title: 'To Date', dataIndex: 'toDate', key: 'toDate', render: cellText },
+      { title: 'File', dataIndex: 'fileName', key: 'fileName', ellipsis: true, render: cellText },
       {
         title: 'Rows',
         dataIndex: 'rowCount',
         key: 'rowCount',
-        width: 80,
         align: 'right',
         render: (v) => (v == null ? '—' : String(v)),
       },
@@ -407,7 +397,6 @@ export default function CompanyAdminStoreBulkDownloadPage() {
         title: 'Stored At',
         dataIndex: 'createdAt',
         key: 'createdAt',
-        width: 170,
         render: formatStoredAt,
       },
       {
@@ -452,150 +441,142 @@ export default function CompanyAdminStoreBulkDownloadPage() {
         <div
           style={{
             display: 'flex',
+            alignItems: 'center',
             justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: 12,
+            padding: '12px 16px',
+            background: '#f8f9fa',
+            border: '1px solid var(--exim-border-light)',
+            borderRadius: 8,
             flexWrap: 'wrap',
+            gap: 16
           }}
         >
           <div>
-            <Title level={3} style={{ margin: 0 }}>
-              Store Bulk Download
-            </Title>
-            <Text type="secondary">
-              Submit eBRC bulk requests on DGFT, store attachments locally, and export stored Excel
-              later.
+            <Title level={5} style={{ margin: 0 }}>Store Bulk Download</Title>
+            <Text type="secondary" style={{ fontSize: 13 }}>
+              Manage eBRC bulk requests on DGFT and stored attachments.
             </Text>
           </div>
           <Button
             icon={<ReloadOutlined />}
-            loading={dgftLoading || storedLoading}
             onClick={refreshAll}
-            disabled={!BACKEND_URL || dgftLoading || storedLoading || submittingRequest}
+            disabled={!BACKEND_URL || submittingRequest}
           >
-            Refresh
+            Refresh All
           </Button>
         </div>
 
-        <Card size="small" title="Submit bulk download request">
-          <Text type="secondary" style={{ display: 'block', marginBottom: 16 }}>
-            Select a date range ({DATE_FORMAT}). The system auto-splits each month into 1–15 and
-            16–end and submits one request per chunk to DGFT.
-          </Text>
-          <Form
-            form={submitForm}
-            layout="vertical"
-            disabled={submittingRequest}
-            onValuesChange={(changed, all) => {
-              const range = all.dateRange
-              if (!changed.dateRange || !Array.isArray(range)) return
-              const [from, to] = range
-              if (from?.isValid() && to?.isValid()) {
-                loadSplitPreview(from, to)
-              } else {
-                setSplitChunks([])
-              }
-            }}
-          >
-            <Form.Item
-              name="dateRange"
-              label="Date range"
-              rules={[{ required: true, message: 'Date range is required' }]}
-            >
-              <DatePicker.RangePicker format={DATE_FORMAT} allowClear={false} style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                loading={submittingRequest}
-                disabled={!BACKEND_URL || !splitChunks.length}
-                onClick={handleSubmitBulkRequest}
-              >
-                Submit {splitChunks.length ? `${splitChunks.length} request(s)` : 'request'}
-              </Button>
-            </Form.Item>
-          </Form>
 
-          {splitChunks.length ? (
-            <div style={{ marginTop: 16 }}>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                Split preview
-              </Text>
-              <Table
-                rowKey={(row, index) => `${row.fromDate}-${row.toDate}-${index}`}
-                size="small"
-                columns={splitPreviewColumns}
-                dataSource={splitChunks}
-                pagination={false}
-              />
-            </div>
-          ) : null}
-        </Card>
 
-        <Card
-          size="small"
-          title={
-            <Space>
-              <CloudDownloadOutlined />
-              <span>DGFT bulk requests</span>
-            </Space>
-          }
-          styles={{ body: { padding: 0 } }}
-        >
-          <Table
-            rowKey={(row, index) => `${row?.attachId ?? row?.srNo ?? 'row'}-${row?.requestDateTime ?? index}`}
-            size="small"
-            loading={dgftLoading}
-            columns={dgftColumns}
-            dataSource={dgftRows}
-            pagination={{
-              pageSize: 20,
-              showSizeChanger: true,
-              showTotal: (total) => `${total} request(s)`,
-            }}
-            scroll={{ x: 'max-content' }}
-            locale={{ emptyText: 'No DGFT bulk download requests found' }}
-          />
-          {!dgftLoading && dgftRows.length > 0 ? (
-            <div style={{ padding: '8px 16px' }}>
-              <Text type="secondary">Total: {dgftCount || dgftRows.length}</Text>
-            </div>
-          ) : null}
-        </Card>
-
-        <Card
-          size="small"
-          title={
-            <Space>
-              <SaveOutlined />
-              <span>Stored attachments</span>
-            </Space>
-          }
-          styles={{ body: { padding: 0 } }}
-        >
-          <Table
-            rowKey="id"
-            size="small"
-            loading={storedLoading}
-            columns={storedColumns}
-            dataSource={storedRows}
-            pagination={{
-              current: storedPage,
-              pageSize: storedPageSize,
-              total: storedTotal,
-              showSizeChanger: true,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              showTotal: (total) => `${total} stored attachment(s)`,
-              onChange: (page, size) => {
-                setStoredPage(page)
-                setStoredPageSize(size)
+        <div style={{ width: '100%', minWidth: 0 }}>
+          <Tabs
+            items={[
+              {
+                label: 'DGFT Bulk Requests',
+                key: 'requests',
+                children: (
+                  <ProDataTable
+                    columns={dgftColumns}
+                    fetchData={fetchDgftRequests}
+                    refreshKey={refreshDgftKey}
+                    rowKey={(row, index) => `${row?.attachId ?? row?.srNo ?? 'row'}-${row?.requestDateTime ?? index}`}
+                    showSelectionColumn={false}
+                    globalSearchPlaceholder="Search requests..."
+                    customToolbarActions={
+                      <Space size={12} align="center">
+                        {!showRequestForm ? (
+                          <Tooltip title="Bulk Download request">
+                            <Button
+                              type="primary"
+                              icon={<PlusOutlined />}
+                              onClick={() => setShowRequestForm(true)}
+                            >
+                              Bulk Download
+                            </Button>
+                          </Tooltip>
+                        ) : (
+                          <Form
+                            form={submitForm}
+                            layout="inline"
+                            disabled={submittingRequest}
+                            onValuesChange={(changed, all) => {
+                              const range = all.dateRange
+                              if (!changed.dateRange || !Array.isArray(range)) return
+                              const [from, to] = range
+                              if (from?.isValid() && to?.isValid()) {
+                                loadSplitPreview(from, to)
+                              } else {
+                                setSplitChunks([])
+                              }
+                            }}
+                          >
+                            <Form.Item
+                              name="dateRange"
+                              style={{ margin: 0, marginRight: 8, width: 260 }}
+                              rules={[{ required: true, message: 'Date range required' }]}
+                            >
+                              <DatePicker.RangePicker format={DATE_FORMAT} allowClear={false} placeholder={['Start Date', 'End Date']} />
+                            </Form.Item>
+                            <Form.Item style={{ margin: 0 }}>
+                              <Button
+                                type="primary"
+                                icon={<PlusOutlined />}
+                                loading={submittingRequest}
+                                disabled={!BACKEND_URL || !splitChunks.length}
+                                onClick={handleSubmitBulkRequest}
+                              >
+                                Submit {splitChunks.length ? `(${splitChunks.length})` : ''}
+                              </Button>
+                            </Form.Item>
+                            <Form.Item style={{ margin: 0, marginLeft: 4 }}>
+                              <Button
+                                type="text"
+                                icon={<CloseOutlined />}
+                                onClick={() => {
+                                  setShowRequestForm(false)
+                                  submitForm.resetFields()
+                                  setSplitChunks([])
+                                }}
+                              />
+                            </Form.Item>
+                          </Form>
+                        )}
+                        <Button
+                          icon={<ReloadOutlined />}
+                          onClick={() => setRefreshDgftKey(prev => prev + 1)}
+                        >
+                          Reload
+                        </Button>
+                      </Space>
+                    }
+                  />
+                )
               },
-            }}
-            scroll={{ x: 'max-content' }}
-            locale={{ emptyText: 'No stored attachments yet — use Store on a DGFT request row' }}
+              {
+                label: 'Stored Attachments',
+                key: 'stored',
+                children: (
+                  <ProDataTable
+                    columns={storedColumns}
+                    fetchData={fetchStoredAttachments}
+                    refreshKey={refreshStoredKey}
+                    rowKey="id"
+                    showSelectionColumn={false}
+                    globalSearchPlaceholder="Search stored..."
+                    customToolbarActions={
+                      <Button
+                        icon={<ReloadOutlined />}
+                        onClick={() => setRefreshStoredKey(prev => prev + 1)}
+                      >
+                        Reload
+                      </Button>
+                    }
+                  />
+                )
+              }
+            ]}
           />
-        </Card>
+        </div>
       </Space>
     </AppShell>
   )

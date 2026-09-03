@@ -1,8 +1,10 @@
-import { ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons'
+import { cn } from '@/lib/utils'
+import { TrendingUp, TrendingDown } from 'lucide-react'
 
 /**
  * KPI stat card for dashboards — shows a metric with optional icon,
  * trend indicator, and subtitle.
+ * Pure Tailwind + Lucide — zero AntD.
  */
 export default function StatCard({
   title,
@@ -14,109 +16,51 @@ export default function StatCard({
   color = 'var(--exim-primary)',
   onClick,
   style,
+  className,
 }) {
-  const bgLight = color === 'var(--exim-success)' ? 'var(--exim-success-light)'
-    : color === 'var(--exim-warning)' ? 'var(--exim-warning-light)'
-    : color === 'var(--exim-error)' ? 'var(--exim-error-light)'
-    : 'var(--exim-primary-50)'
-
   return (
     <div
       onClick={onClick}
-      style={{
-        background: 'var(--exim-surface)',
-        border: '1px solid var(--exim-border-light)',
-        borderRadius: 'var(--radius-lg)',
-        padding: '20px 24px',
-        flex: '1 1 220px',
-        minWidth: 200,
-        cursor: onClick ? 'pointer' : 'default',
-        transition: 'all var(--transition-base)',
-        boxShadow: 'var(--shadow-xs)',
-        position: 'relative',
-        overflow: 'hidden',
-        ...(onClick ? {} : {}),
-        ...style,
-      }}
-      onMouseEnter={(e) => {
-        if (onClick) {
-          e.currentTarget.style.boxShadow = 'var(--shadow-md)'
-          e.currentTarget.style.transform = 'translateY(-2px)'
-          e.currentTarget.style.borderColor = 'var(--exim-primary-100)'
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (onClick) {
-          e.currentTarget.style.boxShadow = 'var(--shadow-xs)'
-          e.currentTarget.style.transform = 'translateY(0)'
-          e.currentTarget.style.borderColor = 'var(--exim-border-light)'
-        }
-      }}
+      className={cn(
+        'relative overflow-hidden rounded-xl border border-slate-200/60 bg-white p-5 shadow-sm transition-all duration-200',
+        onClick && 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:border-primary-200',
+        className,
+      )}
+      style={style}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{
-            fontSize: 13,
-            fontWeight: 500,
-            color: 'var(--exim-text-secondary)',
-            marginBottom: 8,
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-          }}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
             {title}
           </div>
-          <div style={{
-            fontSize: 28,
-            fontWeight: 700,
-            color: 'var(--exim-text-primary)',
-            lineHeight: 1.1,
-            letterSpacing: '-0.5px',
-          }}>
+          <div className="mt-2 text-[28px] font-bold leading-none tracking-tight text-slate-900">
             {value ?? '—'}
           </div>
-          {subtitle ? (
-            <div style={{
-              fontSize: 13,
-              color: 'var(--exim-text-muted)',
-              marginTop: 6,
-            }}>
+          {subtitle && (
+            <div className="mt-1.5 text-[13px] text-slate-400">
               {subtitle}
             </div>
-          ) : null}
+          )}
           {trend != null && (
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              marginTop: 8,
-              fontSize: 12,
-              fontWeight: 600,
-              color: trend === 'up' ? 'var(--exim-success)' : trend === 'down' ? 'var(--exim-error)' : 'var(--exim-text-muted)',
-              background: trend === 'up' ? 'var(--exim-success-light)' : trend === 'down' ? 'var(--exim-error-light)' : 'var(--exim-gray-100)',
-              padding: '2px 8px',
-              borderRadius: 'var(--radius-sm)',
-            }}>
-              {trend === 'up' ? <ArrowUpOutlined style={{ fontSize: 10 }} /> : trend === 'down' ? <ArrowDownOutlined style={{ fontSize: 10 }} /> : null}
+            <div className={cn(
+              'mt-2 inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[12px] font-semibold',
+              trend === 'up' && 'bg-emerald-50 text-emerald-600',
+              trend === 'down' && 'bg-red-50 text-red-600',
+              trend !== 'up' && trend !== 'down' && 'bg-slate-100 text-slate-500',
+            )}>
+              {trend === 'up' ? <TrendingUp className="h-3 w-3" /> : trend === 'down' ? <TrendingDown className="h-3 w-3" /> : null}
               {trendValue}
             </div>
           )}
         </div>
-        {icon ? (
-          <div style={{
-            width: 44,
-            height: 44,
-            borderRadius: 'var(--radius-md)',
-            background: bgLight,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: color,
-            fontSize: 20,
-            flexShrink: 0,
-          }}>
+        {icon && (
+          <div
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-xl"
+            style={{ background: color === 'var(--exim-success)' ? '#ECFDF5' : color === 'var(--exim-warning)' ? '#FFFBEB' : color === 'var(--exim-error)' ? '#FEF2F2' : '#F0F4FF', color }}
+          >
             {icon}
           </div>
-        ) : null}
+        )}
       </div>
     </div>
   )

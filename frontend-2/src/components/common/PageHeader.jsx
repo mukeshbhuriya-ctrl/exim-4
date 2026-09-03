@@ -1,65 +1,45 @@
-import { Typography } from 'antd'
-
-const { Text } = Typography
+import { cn } from '@/lib/utils'
 
 /**
- * Page header — title, optional description, and action buttons.
+ * PageHeader — title, optional description, and action buttons.
  * Used at the top of every page inside AppShell.
+ * Pure Tailwind — no AntD dependency.
  */
-export default function PageHeader({ title, description, actions, breadcrumbs }) {
+export default function PageHeader({ title, description, actions, breadcrumbs, className }) {
   return (
-    <div className="exim-fade-in" style={{ marginBottom: 12 }}>
+    <div className={cn('mb-4', className)}>
       {breadcrumbs?.length ? (
-        <div style={{ marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+        <div className="mb-1 flex items-center gap-1 flex-wrap">
           {breadcrumbs.map((crumb, i) => (
-            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-              {i > 0 && (
-                <span style={{ color: 'var(--exim-gray-300)', fontSize: 12 }}>/</span>
-              )}
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: i === breadcrumbs.length - 1 ? 'var(--exim-text-primary)' : 'var(--exim-text-muted)',
-                  fontWeight: i === breadcrumbs.length - 1 ? 500 : 400,
-                }}
+            <span key={i} className="inline-flex items-center gap-1">
+              {i > 0 && <span className="text-xs text-slate-300">/</span>}
+              <span
+                className={cn(
+                  'text-xs',
+                  i === breadcrumbs.length - 1
+                    ? 'font-medium text-slate-900'
+                    : 'text-slate-400',
+                )}
               >
                 {crumb}
-              </Text>
+              </span>
             </span>
           ))}
         </div>
       ) : null}
-      <div style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
-        gap: 16,
-        flexWrap: 'wrap',
-      }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <h2 style={{
-            fontSize: 20,
-            fontWeight: 700,
-            color: 'var(--exim-text-primary)',
-            lineHeight: 1.1,
-            margin: 0,
-            letterSpacing: '-0.3px',
-          }}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-xl font-bold tracking-tight text-slate-900 leading-tight">
             {title}
           </h2>
           {description ? (
-            <Text style={{
-              color: 'var(--exim-text-secondary)',
-              fontSize: 13,
-              marginTop: 2,
-              display: 'block',
-            }}>
+            <p className="mt-0.5 text-[13px] text-slate-500 leading-relaxed">
               {description}
-            </Text>
+            </p>
           ) : null}
         </div>
         {actions ? (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexShrink: 0, alignItems: 'center' }}>
+          <div className="flex shrink-0 items-center gap-2 flex-wrap">
             {actions}
           </div>
         ) : null}

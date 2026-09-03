@@ -1,10 +1,9 @@
-import { Layout } from 'antd'
 import AppHeader from './AppHeader.jsx'
-
-const { Content } = Layout
 
 /**
  * AppShell — wraps every authenticated page with sidebar + header + content area.
+ * Uses proper scroll containment: sidebar and header stay fixed,
+ * only the content area scrolls.
  *
  * Usage:
  *   <AppShell sidebar={<CompanySidebar />}>
@@ -14,24 +13,16 @@ const { Content } = Layout
  */
 export default function AppShell({ children, sidebar, portalType = 'company' }) {
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <div className="flex h-screen overflow-hidden bg-slate-50">
       {sidebar}
-      <Layout style={{ minWidth: 0, background: 'var(--exim-bg)' }}>
+      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
         <AppHeader portalType={portalType} />
-        <Content
-          style={{
-            padding: 24,
-            minWidth: 0,
-            maxWidth: '100%',
-            boxSizing: 'border-box',
-            overflowX: 'hidden',
-          }}
-        >
-          <div className="exim-fade-in">
+        <main className="flex-1 overflow-auto p-5 lg:p-6">
+          <div className="exim-fade-in mx-auto max-w-[1600px]">
             {children}
           </div>
-        </Content>
-      </Layout>
-    </Layout>
+        </main>
+      </div>
+    </div>
   )
 }

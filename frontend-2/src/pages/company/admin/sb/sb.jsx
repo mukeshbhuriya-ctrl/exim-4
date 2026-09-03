@@ -1,10 +1,10 @@
-import { DownloadOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
-import { Button, Input, Layout, Select, Space, Switch, Table, Tag, Typography, message } from 'antd'
+import { DownloadOutlined, ReloadOutlined, SearchOutlined, RightOutlined, DownOutlined } from '@ant-design/icons'
+import { Button, Input, Layout, Select, Space, Switch, Table, Tag, Typography, message, Drawer, Tabs } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import * as XLSX from 'xlsx'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
-import PageHeader from '../../../../components/common/PageHeader.jsx'
+import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -85,7 +85,6 @@ function appendObjectSheet(wb, title, rows) {
 
 const FETCH_USING_OPTIONS = [
   { value: 'dricat', label: 'dricat' },
-  { value: 'selenium', label: 'selenium' },
 ]
 
 function normalizeFetchUsing(value) {
@@ -288,6 +287,27 @@ export default function CompanyAdminSbPage() {
       setDetailTotalCount(0)
     }
   }, [selectedDayKey])
+
+  const [refreshDaysKey, setRefreshDaysKey] = useState(0)
+
+  const fetchDaysGrid = useCallback(async () => {
+    if (!BACKEND_URL) return { data: [], meta: { total: 0 } }
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/company/admin/sb/process-shipping-bill-dates`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.detail || data?.message || `Failed to load SB process dates (${res.status})`)
+      const list = normalizeDaysFromResponse(data).filter((d) => d && typeof d === 'object')
+      setDates(list)
+      return { data: list, meta: { total: list.length } }
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : 'Failed to load SB process dates')
+      setDates([])
+      return { data: [], meta: { total: 0 } }
+    }
+  }, [BACKEND_URL])
 
   const applySearch = useCallback(async () => {
     if (!BACKEND_URL) {
@@ -551,6 +571,12 @@ export default function CompanyAdminSbPage() {
         )
       },
       rowExpandable: () => true,
+      expandIcon: ({ expanded, onExpand, record }) =>
+        expanded ? (
+          <DownOutlined style={{ fontSize: 12, cursor: 'pointer', color: 'var(--exim-gray-600)', margin: '0 8px' }} onClick={e => onExpand(record, e)} />
+        ) : (
+          <RightOutlined style={{ fontSize: 12, cursor: 'pointer', color: 'var(--exim-gray-600)', margin: '0 8px' }} onClick={e => onExpand(record, e)} />
+        ),
     }),
     [scrapedSubTableColumns],
   )
@@ -653,7 +679,8 @@ export default function CompanyAdminSbPage() {
       } else {
         message.success(data?.message || 'Shipping bill process started or completed')
       }
-      await Promise.all([fetchProcessDates(), fetchUnfetchedCount()])
+      await fetchUnfetchedCount()
+      setRefreshDaysKey((prev) => prev + 1)
       const dk = data?.dayKey ?? data?.data?.dayKey
       if (dk != null) {
         setSelectedDayKey(String(dk))
@@ -694,7 +721,8 @@ export default function CompanyAdminSbPage() {
       } else {
         message.success(data?.message || 'Random 10 shipping bills processed')
       }
-      await Promise.all([fetchProcessDates(), fetchUnfetchedCount()])
+      await fetchUnfetchedCount()
+      setRefreshDaysKey((prev) => prev + 1)
       const dk = data?.dayKey ?? data?.data?.dayKey
       if (dk != null) {
         setSelectedDayKey(String(dk))
@@ -707,340 +735,231 @@ export default function CompanyAdminSbPage() {
   }
 
   const refreshDaysAndCount = useCallback(async () => {
-    await Promise.all([fetchProcessDates(), fetchUnfetchedCount()])
-  }, [fetchProcessDates, fetchUnfetchedCount])
+    await fetchUnfetchedCount()
+    setRefreshDaysKey((prev) => prev + 1)
+  }, [fetchUnfetchedCount])
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
           <Space direction="vertical" size="large" style={{ width: '100%', maxWidth: '100%' }}>
-            <PageHeader
-              title="Shipping Bill Process"
-              description={
-                unfetchedCount
-                  ? `PDF registry vs successful fetches in ${unfetchedCount.collection || 'sbonline'}`
-                  : 'Manage shipping bill fetching operations'
-              }
-            />
-            {unfetchedCount || unfetchedCountLoading ? (
-              <div
-                style={{
-                  padding: '12px 16px',
-                  background: unfetchedCount?.unfetchedCount > 0 ? '#fffbe6' : '#f6ffed',
-                  border: `1px solid ${unfetchedCount?.unfetchedCount > 0 ? '#ffe58f' : '#b7eb8f'}`,
-                  borderRadius: 8,
-                }}
-              >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                background: unfetchedCount?.unfetchedCount > 0 ? '#fffbe6' : '#f6ffed',
+                border: `1px solid ${unfetchedCount?.unfetchedCount > 0 ? '#ffe58f' : '#b7eb8f'}`,
+                borderRadius: 8,
+                flexWrap: 'wrap',
+                gap: 16
+              }}
+            >
+              <div>
+                <Title level={5} style={{ margin: 0 }}>Shipping Bill Process</Title>
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  {unfetchedCount
+                    ? `PDF registry vs successful fetches in ${unfetchedCount.collection || 'sbonline'}`
+                    : 'Manage shipping bill fetching operations'}
+                  {unfetchedCount?.message ? ` — ${unfetchedCount.message}` : ''}
+                </Text>
+              </div>
+
+              {(unfetchedCount || unfetchedCountLoading) && (
                 <Space wrap size={[8, 8]}>
                   <Tag>Registered: {unfetchedCount?.registeredCount ?? '—'}</Tag>
                   <Tag color="green">Fetched (success): {unfetchedCount?.fetchedSuccessCount ?? '—'}</Tag>
                   <Tag color={unfetchedCount?.unfetchedCount > 0 ? 'orange' : 'green'}>
                     Unfetched: {unfetchedCount?.unfetchedCount ?? '—'}
                   </Tag>
-                  {unfetchedCountLoading ? <Text type="secondary">Updating…</Text> : null}
+                  {unfetchedCountLoading ? <Text type="secondary" style={{ fontSize: 12 }}>Updating…</Text> : null}
                 </Space>
-                {unfetchedCount?.message ? (
-                  <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-                    {unfetchedCount.message}
-                  </Text>
-                ) : null}
-              </div>
-            ) : null}
-
-            <Space wrap align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
-
-              <Space wrap>
-                <Space align="center" size={8}>
-                  <Text type="secondary">Fetch using:</Text>
-                  <Select
-                    value={fetchUsing}
-                    onChange={setFetchUsing}
-                    options={FETCH_USING_OPTIONS}
-                    style={{ width: 210 }}
-                    disabled={submitting || submittingRandomTen}
-                  />
-                </Space>
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={refreshDaysAndCount}
-                  loading={datesLoading || unfetchedCountLoading}
-                  disabled={!BACKEND_URL || datesLoading || unfetchedCountLoading || submitting || submittingRandomTen}
-                >
-                  Refresh days
-                </Button>
-                <Button
-                  type="primary"
-                  onClick={handleRunProcess}
-                  loading={submitting}
-                  disabled={!BACKEND_URL || submitting || submittingRandomTen}
-                >
-                  Process shipping bill
-                </Button>
-                <Button
-                  onClick={handleProcessRandomTen}
-                  loading={submittingRandomTen}
-                  disabled={!BACKEND_URL || submitting || submittingRandomTen}
-                >
-                  Process random 10
-                </Button>
-              </Space>
-            </Space>
-
-            {lastPost && (
-              <div
-                style={{
-                  padding: '12px 16px',
-                  background: '#fafafa',
-                  border: '1px solid #f0f0f0',
-                  borderRadius: 8,
-                  maxWidth: '100%',
-                }}
-              >
-                <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                  Last POST response
-                </Text>
-                <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                  {lastPost?.dayKey != null ? (
-                    <Text>
-                      dayKey: <Text code>{String(lastPost.dayKey)}</Text>
-                    </Text>
-                  ) : null}
-                  {lastPost?.batchId != null ? (
-                    <Text>
-                      batchId: <Text code>{String(lastPost.batchId)}</Text>
-                    </Text>
-                  ) : null}
-                  {lastPost?.data?.dayKey != null && lastPost?.dayKey == null ? (
-                    <Text>
-                      dayKey: <Text code>{String(lastPost.data.dayKey)}</Text>
-                    </Text>
-                  ) : null}
-                  {lastPost?.data?.batchId != null && lastPost?.batchId == null ? (
-                    <Text>
-                      batchId: <Text code>{String(lastPost.data.batchId)}</Text>
-                    </Text>
-                  ) : null}
-                  {lastPost?.onlyUnprocessed != null ? (
-                    <Text>
-                      onlyUnprocessed: <Text code>{String(lastPost.onlyUnprocessed)}</Text>
-                    </Text>
-                  ) : null}
-                  {lastPost?.message ? <Text type="secondary">{String(lastPost.message)}</Text> : null}
-                </Space>
-              </div>
-            )}
-
-            <div style={{ width: '100%', minWidth: 0 }}>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                Search SB No (all company records)
-              </Text>
-              <Space wrap align="center" style={{ marginBottom: 16 }}>
-                <Input.TextArea
-                  placeholder="Enter one or more SB Nos (comma / space / newline separated)"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  onPressEnter={(e) => {
-                    if (!e.shiftKey) {
-                      e.preventDefault()
-                      applySearch()
-                    }
-                  }}
-                  autoSize={{ minRows: 1, maxRows: 3 }}
-                  allowClear
-                  style={{ width: 420, maxWidth: '100%' }}
-                />
-                <Button
-                  type="primary"
-                  icon={<SearchOutlined />}
-                  onClick={applySearch}
-                  loading={searchLoading}
-                  disabled={!BACKEND_URL || searchLoading}
-                >
-                  Search
-                </Button>
-                <Button onClick={clearSearch} disabled={!hasActiveSearch && !searchInput}>
-                  Clear
-                </Button>
-              </Space>
+              )}
             </div>
 
             <div style={{ width: '100%', minWidth: 0 }}>
-              <Text strong style={{ display: 'block', marginBottom: 8 }}>
-                Process days ({dates.length})
-              </Text>
-              <Table
-                size="small"
-                loading={datesLoading}
-                rowKey={(record, index) => dayRowKey(record, index)}
+              <ProDataTable
                 columns={datesColumns}
-                dataSource={dates}
-                pagination={{ pageSize: 15, showSizeChanger: true }}
-                locale={{ emptyText: 'No shipping bill process days yet' }}
-                onRow={(record) => ({
-                  onClick: () => {
-                    const key = record?.dayKey ?? record?.id
-                    if (key != null) setSelectedDayKey(String(key))
-                  },
-                  style: {
-                    cursor: record?.dayKey != null || record?.id != null ? 'pointer' : 'default',
-                    background:
-                      selectedDayKey != null && String(record?.dayKey ?? record?.id) === selectedDayKey
-                        ? '#e6f4ff'
-                        : undefined,
-                  },
-                })}
-                scroll={{ x: 'max-content' }}
+                fetchData={fetchDaysGrid}
+                refreshKey={refreshDaysKey}
+                rowKey={(record, index) => dayRowKey(record, index)}
+                globalSearchPlaceholder="Search process days..."
+                showSelectionColumn={false}
+                customToolbarActions={
+                  <Space size={12} align="center">
+                    <Input.Search
+                      placeholder="Search SB No (comma/space separated)"
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      onSearch={applySearch}
+                      enterButton="Search"
+                      loading={searchLoading}
+                      disabled={!BACKEND_URL}
+                      style={{ width: 280 }}
+                      allowClear
+                      onClear={clearSearch}
+                    />
+                    <Button onClick={clearSearch} disabled={!hasActiveSearch && !searchInput}>
+                      Clear Search
+                    </Button>
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={refreshDaysAndCount}
+                      loading={unfetchedCountLoading}
+                      disabled={!BACKEND_URL || unfetchedCountLoading || submitting || submittingRandomTen}
+                    >
+                      Refresh days
+                    </Button>
+                    <Button
+                      type="primary"
+                      onClick={handleRunProcess}
+                      loading={submitting}
+                      disabled={!BACKEND_URL || submitting || submittingRandomTen}
+                    >
+                      Process shipping bill
+                    </Button>
+                    <Button
+                      onClick={handleProcessRandomTen}
+                      loading={submittingRandomTen}
+                      disabled={!BACKEND_URL || submitting || submittingRandomTen}
+                    >
+                      Process random 10
+                    </Button>
+                  </Space>
+                }
               />
             </div>
 
-            {selectedDayKey || searchMode ? (
-              <div style={{ width: '100%', minWidth: 0 }}>
-                <Space align="start" wrap style={{ width: '100%', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div>
-                    <Title level={5} style={{ margin: 0 }}>
-                      {searchMode
-                        ? 'Search results — success & scraped data'
-                        : 'Day detail — success & scraped data'}
-                    </Title>
-                    <Text type="secondary" style={{ marginTop: 4 }}>
-                      {searchMode ? (
-                        <>
-                          Searched {searchedSbNos.length} SB No(s)
-                          {searchedSbNos.length ? (
-                            <>
-                              :{' '}
-                              <Text code>{searchedSbNos.slice(0, 8).join(', ')}</Text>
-                              {searchedSbNos.length > 8 ? '…' : ''}
-                            </>
-                          ) : null}
-                          {' · '}
-                          {detailRows.length} success · {detailErrorRows.length} error
-                          {detailTotalCount > 0 ? ` · ${detailTotalCount} total` : ''}
-                          {notFoundSbNos.length ? (
-                            <>
-                              {' · '}
-                              Not found: <Text code>{notFoundSbNos.slice(0, 8).join(', ')}</Text>
-                              {notFoundSbNos.length > 8 ? '…' : ''}
-                            </>
-                          ) : null}
-                        </>
-                      ) : (
-                        <>
-                          dayKey: <Text code>{selectedDayKey}</Text> · {detailRows.length} success ·{' '}
-                          {detailErrorRows.length} error
-                          {detailTotalCount > 0 ? ` · ${detailTotalCount} total for this day` : ''}
-                        </>
-                      )}
-                      . Expand a row for <Text code>scrapedData</Text>.
-                    </Text>
-                  </div>
-                  <Space wrap>
-                    <Button
-                      type="primary"
-                      icon={<DownloadOutlined />}
-                      onClick={() => {
-                        if (!detailRows.length && !detailErrorRows.length) {
-                          message.warning('No rows to export.')
-                          return
-                        }
-                        try {
-                          downloadSbDayExcel(
-                            detailRows,
-                            searchMode ? 'search' : selectedDayKey,
-                            detailErrorRows,
-                          )
-                          message.success('Excel file downloaded.')
-                        } catch (e) {
-                          message.error(e instanceof Error ? e.message : 'Export failed')
-                        }
-                      }}
-                      disabled={
-                        detailLoading ||
-                        searchLoading ||
-                        (!detailRows.length && !detailErrorRows.length)
+            <Drawer
+              title={
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: 16, fontWeight: 600 }}>
+                    {searchMode ? 'Search Results' : `Process Day Detail`}
+                  </span>
+                  <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--exim-gray-500)', marginTop: 4 }}>
+                    {searchMode ? (
+                      <>
+                        Searched {searchedSbNos.length} SB No(s)
+                        {notFoundSbNos.length ? ` · Not found: ${notFoundSbNos.slice(0, 5).join(', ')}${notFoundSbNos.length > 5 ? '…' : ''}` : ''}
+                      </>
+                    ) : (
+                      `Date Key: ${selectedDayKey}`
+                    )}
+                  </span>
+                </div>
+              }
+              placement="right"
+              width="85%"
+              onClose={() => {
+                if (searchMode) clearSearch()
+                else setSelectedDayKey(null)
+              }}
+              open={!!selectedDayKey || searchMode}
+              extra={
+                <Space>
+                  <Button
+                    type="primary"
+                    icon={<DownloadOutlined />}
+                    onClick={() => {
+                      if (!detailRows.length && !detailErrorRows.length) {
+                        message.warning('No rows to export.')
+                        return
                       }
-                    >
-                      Export to Excel
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        if (searchMode) clearSearch()
-                        else setSelectedDayKey(null)
-                      }}
-                      disabled={detailLoading || searchLoading}
-                    >
-                      Close detail
-                    </Button>
-                  </Space>
+                      try {
+                        downloadSbDayExcel(
+                          detailRows,
+                          searchMode ? 'search' : selectedDayKey,
+                          detailErrorRows,
+                        )
+                        message.success('Excel file downloaded.')
+                      } catch (e) {
+                        message.error(e instanceof Error ? e.message : 'Export failed')
+                      }
+                    }}
+                    disabled={detailLoading || searchLoading || (!detailRows.length && !detailErrorRows.length)}
+                  >
+                    Export to Excel
+                  </Button>
                 </Space>
-                <div
-                  style={{
-                    width: '100%',
-                    minWidth: 0,
-                    maxWidth: '100%',
-                    overflowX: 'auto',
-                    WebkitOverflowScrolling: 'touch',
-                    boxSizing: 'border-box',
-                  }}
-                >
-                  <Table
-                    size="small"
-                    loading={detailLoading || searchLoading}
-                    rowKey={(r) => String(r?.id ?? r?._id ?? `${selectedDayKey || 'search'}-${r?.sbNo}-${r?.inputIndex}`)}
-                    columns={successDetailColumns}
-                    dataSource={filteredDetailRows}
-                    pagination={{ pageSize: 25, showSizeChanger: true }}
-                    locale={{
-                      emptyText: detailLoading || searchLoading
-                        ? 'Loading…'
-                        : searchMode
-                          ? 'No successful rows match the SB No search'
-                          : 'No successful rows for this day',
-                    }}
-                    scroll={{ x: 'max-content', y: 480 }}
-                    sticky
-                    expandable={scrapedExpandable}
-                  />
-                </div>
-
-                <Title level={5} style={{ margin: '20px 0 12px' }}>
-                  Error rows only
-                </Title>
-                <Text type="secondary" style={{ display: 'block', marginBottom: 12 }}>
-                  Rows with status <Text code>error</Text>
-                  {searchMode ? ' in search results' : ' for this day'}. Expand for any partial{' '}
-                  <Text code>scrapedData</Text>.
-                </Text>
-                <div
-                  style={{
-                    width: '100%',
-                    minWidth: 0,
-                    maxWidth: '100%',
-                    overflowX: 'auto',
-                    WebkitOverflowScrolling: 'touch',
-                    boxSizing: 'border-box',
-                  }}
-                >
-                  <Table
-                    size="small"
-                    loading={detailLoading || searchLoading}
-                    rowKey={(r) => String(r?.id ?? r?._id ?? `err-${selectedDayKey || 'search'}-${r?.sbNo}-${r?.inputIndex}`)}
-                    columns={errorDetailColumns}
-                    dataSource={filteredDetailErrorRows}
-                    pagination={{ pageSize: 25, showSizeChanger: true }}
-                    locale={{
-                      emptyText: detailLoading || searchLoading
-                        ? 'Loading…'
-                        : searchMode
-                          ? 'No error rows match the SB No search'
-                          : 'No error rows for this day',
-                    }}
-                    scroll={{ x: 'max-content', y: 360 }}
-                    sticky
-                    expandable={scrapedExpandable}
-                  />
-                </div>
+              }
+              styles={{
+                header: { padding: '16px 24px', borderBottom: '1px solid var(--exim-border-light)' },
+                body: { padding: '0px', display: 'flex', flexDirection: 'column', backgroundColor: 'var(--exim-gray-50)' },
+              }}
+            >
+              <div style={{ padding: '0 24px', backgroundColor: 'white', borderBottom: '1px solid var(--exim-border-light)', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <Tabs
+                  defaultActiveKey="success"
+                  style={{ height: '100%' }}
+                  items={[
+                    {
+                      key: 'success',
+                      label: (
+                        <span>
+                          Success <Tag color="green" style={{ marginLeft: 8 }}>{filteredDetailRows.length}</Tag>
+                        </span>
+                      ),
+                      children: (
+                        <div style={{ 
+                          background: 'white', 
+                          padding: 16, 
+                          borderRadius: 8, 
+                          border: '1px solid var(--exim-border-light)',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                          marginTop: 16
+                        }}>
+                          <Table
+                            size="small"
+                            loading={detailLoading || searchLoading}
+                            rowKey={(r) => String(r?.id ?? r?._id ?? `${selectedDayKey || 'search'}-${r?.sbNo}-${r?.inputIndex}`)}
+                            columns={successDetailColumns}
+                            dataSource={filteredDetailRows}
+                            pagination={{ pageSize: 25, showSizeChanger: true }}
+                            locale={{ emptyText: 'No rows found.' }}
+                            scroll={{ x: 'max-content', y: 'calc(100vh - 280px)' }}
+                            sticky
+                            expandable={scrapedExpandable}
+                            className="custom-table"
+                          />
+                        </div>
+                      )
+                    },
+                    {
+                      key: 'error',
+                      label: (
+                        <span>
+                          Error <Tag color="error" style={{ marginLeft: 8 }}>{filteredDetailErrorRows.length}</Tag>
+                        </span>
+                      ),
+                      children: (
+                        <div style={{ 
+                          background: 'white', 
+                          padding: 16, 
+                          borderRadius: 8, 
+                          border: '1px solid var(--exim-border-light)',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                          marginTop: 16
+                        }}>
+                          <Table
+                            size="small"
+                            loading={detailLoading || searchLoading}
+                            rowKey={(r) => String(r?.id ?? r?._id ?? `err-${selectedDayKey || 'search'}-${r?.sbNo}-${r?.inputIndex}`)}
+                            columns={errorDetailColumns}
+                            dataSource={filteredDetailErrorRows}
+                            pagination={{ pageSize: 25, showSizeChanger: true }}
+                            locale={{ emptyText: 'No error rows found.' }}
+                            scroll={{ x: 'max-content', y: 'calc(100vh - 280px)' }}
+                            sticky
+                            expandable={scrapedExpandable}
+                            className="custom-table"
+                          />
+                        </div>
+                      )
+                    }
+                  ]}
+                />
               </div>
-            ) : null}
+            </Drawer>
           </Space>
         </AppShell>
   )
