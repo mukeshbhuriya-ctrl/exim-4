@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
+import { AccessControl } from '../../../../components/iam/AccessControl.jsx'
 
 const { Title, Text } = Typography
 const { Dragger } = Upload
@@ -675,6 +676,7 @@ export default function CompanyAdminSalesDataCleanPage() {
               Cancel & Back to Rules
             </Button>
           ) : (
+            <AccessControl required="initialization:sales_data_clean:update">
             <Space size={16} split={<div style={{ width: 1, height: 24, background: 'var(--exim-border-light)' }} />}>
               <Button onClick={fetchSavedConfig} loading={loadingSaved} disabled={!BACKEND_URL}>
                 Reload Saved
@@ -693,6 +695,7 @@ export default function CompanyAdminSalesDataCleanPage() {
                 Upload Excel
               </Button>
             </Space>
+            </AccessControl>
           )
         }
       />

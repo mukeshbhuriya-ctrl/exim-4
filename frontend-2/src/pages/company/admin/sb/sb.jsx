@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
+import { AccessControl } from '../../../../components/iam/AccessControl.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -810,6 +811,7 @@ export default function CompanyAdminSbPage() {
                     >
                       Refresh days
                     </Button>
+                    <AccessControl required="shipping_bills:sb_records:start">
                     <Button
                       type="primary"
                       onClick={handleRunProcess}
@@ -825,6 +827,8 @@ export default function CompanyAdminSbPage() {
                     >
                       Process random 10
                     </Button>
+                    </AccessControl>
+                   
                   </Space>
                 }
               />

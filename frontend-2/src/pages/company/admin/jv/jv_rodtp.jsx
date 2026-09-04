@@ -7,6 +7,7 @@ import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
 import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
 import { JvRodtpFormatContent } from './jv_rodtp_format.jsx'
+import { AccessControl } from '../../../../components/iam/AccessControl.jsx'
 
 const { Title, Text } = Typography
 
@@ -509,14 +510,17 @@ export function JvRodtpDataContent() {
               title="JV RODTP"
               description="Run JV RODTP process and view date-wise generated rows."
               actions={
-                <Space>
+                <AccessControl required="jv:rodtp">
+                  <Space>
                   <Button icon={<ReloadOutlined />} onClick={() => fetchDates()} loading={loadingDates} disabled={!BACKEND_URL || loadingDates} style={{ borderRadius: 6 }}>
                     Refresh
                   </Button>
                   <Button type="primary" loading={processing} onClick={handleProcess} disabled={!BACKEND_URL} style={{ borderRadius: 6, boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)' }}>
                     Process JV RODTP
                   </Button>
-                </Space>
+                 </Space>
+                </AccessControl>
+                
               }
             />
 

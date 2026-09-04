@@ -24,6 +24,7 @@ import CompanySidebar from '../../../components/company/sidebar.jsx'
 import AppShell from '../../../components/layout/AppShell.jsx'
 import ProDataTable from '../../../components/shared/ProDataTable.jsx'
 import { splitEbrcDateRange } from '../../../utils/ebrcDateRangeSplit.js'
+import { AccessControl } from '../../../components/iam/AccessControl.jsx'
 
 const { Title, Text } = Typography
 
@@ -485,7 +486,8 @@ export default function CompanyAdminStoreBulkDownloadPage() {
                     customToolbarActions={
                       <Space size={12} align="center">
                         {!showRequestForm ? (
-                          <Tooltip title="Bulk Download request">
+                          <AccessControl required="dgft:store_bulk_download:export">
+                            <Tooltip title="Bulk Download request">
                             <Button
                               type="primary"
                               icon={<PlusOutlined />}
@@ -494,6 +496,7 @@ export default function CompanyAdminStoreBulkDownloadPage() {
                               Bulk Download
                             </Button>
                           </Tooltip>
+                          </AccessControl>
                         ) : (
                           <Form
                             form={submitForm}

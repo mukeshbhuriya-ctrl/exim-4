@@ -6,6 +6,7 @@ import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
 import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
+import { AccessControl } from '../../../../components/iam/AccessControl.jsx'
 
 const { Title, Text } = Typography
 
@@ -638,9 +639,12 @@ export default function CompanyAdminReportTemplatesPage() {
             rowKey={(row) => String(row.id || row._id || '')}
             showSelectionColumn={false}
             customToolbarActions={
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsEditing(true)} loading={loadingColumns}>
+              <AccessControl required="analytics:report_templates:create">
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => setIsEditing(true)} loading={loadingColumns}>
                 Create Template
-              </Button>
+                </Button>
+              </AccessControl>
+              
             }
             columns={[
               {
@@ -684,13 +688,16 @@ export default function CompanyAdminReportTemplatesPage() {
                 key: 'action',
                 align: 'center',
                 render: (_, row) => (
-                  <Button
+                  <AccessControl required="analytics:report_templates:edit">
+                    <Button
                     type="text"
                     icon={<EditOutlined />}
                     onClick={() => fetchTemplateById(String(row.id || row._id || ''))}
                     disabled={!row.id && !row._id}
                     style={{ color: '#2563eb' }}
                   />
+                  </AccessControl>
+                  
                 ),
               },
               {

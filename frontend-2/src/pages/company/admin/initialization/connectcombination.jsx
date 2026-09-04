@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
+import { AccessControl } from '../../../../components/iam/AccessControl.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -611,6 +612,7 @@ export default function CompanyAdminConnectCombinationPage() {
         title="Connect Combinations"
         description="Map Sales combinations to PDF combinations to link your data accurately."
         actions={
+          <AccessControl required="initialization:connection:update">
           <Space wrap>
             {isEditing ? (
               <>
@@ -622,6 +624,7 @@ export default function CompanyAdminConnectCombinationPage() {
               <Button type="primary" onClick={() => setIsEditing(true)}>Create Connection</Button>
             )}
           </Space>
+          </AccessControl>
         }
       />
 

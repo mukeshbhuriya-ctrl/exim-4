@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
+import { AccessControl } from '../../../../components/iam/AccessControl.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -580,6 +581,7 @@ export default function CompanyAdminCombinationPage() {
         title="Header Combinations"
         description="Build Sales combinations on the left and PDF combinations on the right, then save both sets together."
         actions={
+          <AccessControl required="initialization:combination:update">
           <Space wrap>
             {isEditing ? (
               <>
@@ -591,6 +593,7 @@ export default function CompanyAdminCombinationPage() {
               <Button type="primary" onClick={() => setIsEditing(true)}>Modify combination</Button>
             )}
           </Space>
+          </AccessControl>
         }
       />
 

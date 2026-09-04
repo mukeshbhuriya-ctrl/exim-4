@@ -6,6 +6,7 @@ import CompanySidebar from '../../../components/company/sidebar.jsx'
 import AppShell from '../../../components/layout/AppShell.jsx'
 import ProDataTable from '../../../components/shared/ProDataTable.jsx'
 import { splitEbrcDateRange } from '../../../utils/ebrcDateRangeSplit.js'
+import { AccessControl } from '../../../components/iam/AccessControl.jsx'
 
 const { Title, Text } = Typography
 
@@ -373,7 +374,8 @@ export default function CompanyAdminEbrcBulkDownloadPage() {
             customToolbarActions={
               <Space size={12} align="center">
                 {!showRequestForm ? (
-                  <Tooltip title="Bulk Download request">
+                  <AccessControl required="dgft:ebrc_bulk_request:export">
+                    <Tooltip title="Bulk Download request">
                     <Button
                       type="primary"
                       icon={<PlusOutlined />}
@@ -382,6 +384,9 @@ export default function CompanyAdminEbrcBulkDownloadPage() {
                       Bulk Download
                     </Button>
                   </Tooltip>
+
+                  </AccessControl>
+                 
                 ) : (
                   <Form
                     form={submitForm}

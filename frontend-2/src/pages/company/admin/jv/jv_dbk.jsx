@@ -7,6 +7,7 @@ import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
 import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
 import { JvDbkFormatContent } from './jv_dbk_format.jsx'
+import { AccessControl } from '../../../../components/iam/AccessControl.jsx'
 
 const { Title, Text } = Typography
 
@@ -509,6 +510,7 @@ export function JvDbkDataContent() {
               title="JV DBK"
               description="Run JV DBK process and view date-wise generated rows."
               actions={
+                <AccessControl required="jv:dbk">
                 <Space>
                   <Button icon={<ReloadOutlined />} onClick={() => fetchDates()} loading={loadingDates} disabled={!BACKEND_URL || loadingDates} style={{ borderRadius: 6 }}>
                     Refresh
@@ -517,6 +519,7 @@ export function JvDbkDataContent() {
                     Process JV DBK
                   </Button>
                 </Space>
+                </AccessControl>
               }
             />
 

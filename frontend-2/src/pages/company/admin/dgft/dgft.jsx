@@ -27,6 +27,7 @@ import * as XLSX from 'xlsx'
 import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
+import { AccessControl } from '../../../../components/iam/AccessControl.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -1068,6 +1069,7 @@ export default function CompanyAdminDgftPage() {
                     <Button onClick={clearSearch} disabled={!hasActiveSearch && !searchInput}>
                       Clear Search
                     </Button>
+                    <AccessControl required="dgft:records:start">
                     <Space align="center" size={8}>
                       <Text type="secondary">Sample size:</Text>
                       <InputNumber
@@ -1095,6 +1097,7 @@ export default function CompanyAdminDgftPage() {
                     >
                       Process random batch
                     </Button>
+                     </AccessControl>
                   </Space>
                 }
               />

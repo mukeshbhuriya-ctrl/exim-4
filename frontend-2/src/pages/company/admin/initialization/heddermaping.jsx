@@ -18,6 +18,7 @@ import AppShell from '../../../../components/layout/AppShell.jsx'
 import '../../../../styles/heddermaping.css'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
 import * as XLSX from 'xlsx'
+import { AccessControl } from '../../../../components/iam/AccessControl.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -1756,6 +1757,7 @@ export default function CompanyAdminUploadPage() {
         </div>
       ))}
       {allowExtraRowControls ? (
+        <AccessControl required="initialization:header_mapping:update">
         <Button
           type="dashed"
           block
@@ -1765,6 +1767,7 @@ export default function CompanyAdminUploadPage() {
         >
           + Add header
         </Button>
+        </AccessControl>
       ) : null}
     </Space>
   )
@@ -1901,6 +1904,7 @@ export default function CompanyAdminUploadPage() {
         </div>
       ))}
       {allowExtraRowControls ? (
+        <AccessControl required="initialization:header_mapping:update">
         <Button
           type="dashed"
           block
@@ -1910,6 +1914,7 @@ export default function CompanyAdminUploadPage() {
         >
           + Add header
         </Button>
+        </AccessControl>
       ) : null}
     </Space>
   )
@@ -1992,6 +1997,7 @@ export default function CompanyAdminUploadPage() {
       children: (
         <div style={sectionCardStyle}>
           <Space direction="vertical" size="large" style={{ width: '100%' }}>
+            <AccessControl required="initialization:header_mapping:upload">
             <div style={{ marginBottom: 16 }}>
               <Upload.Dragger
               multiple={false}
@@ -2017,6 +2023,7 @@ export default function CompanyAdminUploadPage() {
               ) : null}
             </Upload.Dragger>
           </div>
+          </AccessControl>
           
           {columnMappingLoading ? (
             <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
@@ -2075,7 +2082,9 @@ export default function CompanyAdminUploadPage() {
               />
             </div>
             <div style={{ width: 100, textAlign: 'right' }}>
-              <Button type="primary" onClick={handleSaveSalesUniqueColumns} loading={salesUniqueSaving}>Save</Button>
+              <AccessControl required="initialization:header_mapping:update">
+                <Button type="primary" onClick={handleSaveSalesUniqueColumns} loading={salesUniqueSaving}>Save</Button>
+              </AccessControl>
             </div>
           </div>
 
@@ -2096,7 +2105,9 @@ export default function CompanyAdminUploadPage() {
               />
             </div>
             <div style={{ width: 100, textAlign: 'right' }}>
+              <AccessControl required="initialization:header_mapping:update">
               <Button type="primary" onClick={handleSaveFilterDate} loading={filterDateSaving}>Save</Button>
+              </AccessControl>
             </div>
           </div>
 
@@ -2117,7 +2128,9 @@ export default function CompanyAdminUploadPage() {
               />
             </div>
             <div style={{ width: 100, textAlign: 'right' }}>
-              <Button type="primary" onClick={handleSaveFinancialYear} loading={financialYearSaving}>Save</Button>
+              <AccessControl required="initialization:header_mapping:update">
+                <Button type="primary" onClick={handleSaveFinancialYear} loading={financialYearSaving}>Save</Button>
+              </AccessControl>
             </div>
           </div>
 
@@ -2138,7 +2151,9 @@ export default function CompanyAdminUploadPage() {
               />
             </div>
             <div style={{ width: 100, textAlign: 'right' }}>
+              <AccessControl required="initialization:header_mapping:update">
               <Button type="primary" onClick={handleSaveManualMatchDescription} loading={manualMatchDescSaving}>Save</Button>
+              </AccessControl>
             </div>
           </div>
 
@@ -2164,9 +2179,11 @@ export default function CompanyAdminUploadPage() {
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--exim-border-light)' }}>
-              <Button type="primary" size="large" onClick={handleSave} loading={saving}>
-                {existingMappingId ? 'Update Field Mappings' : 'Save Field Mappings'}
-              </Button>
+              <AccessControl required="initialization:header_mapping:update">
+                <Button type="primary" size="large" onClick={handleSave} loading={saving}>
+                  {existingMappingId ? 'Update Field Mappings' : 'Save Field Mappings'}
+                </Button>
+              </AccessControl>
             </div>
           </div>
         </Space>
@@ -2190,9 +2207,11 @@ export default function CompanyAdminUploadPage() {
             </div>
             
             <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 32, paddingTop: 24, borderTop: '1px solid var(--exim-border-light)' }}>
-              <Button type="primary" onClick={handleSaveJv} loading={jvSaving}>
-                {jvExistingMappingId ? 'Update JV Mapping' : 'Save JV Mapping'}
-              </Button>
+              <AccessControl required="initialization:header_mapping:update">
+                <Button type="primary" onClick={handleSaveJv} loading={jvSaving}>
+                  {jvExistingMappingId ? 'Update JV Mapping' : 'Save JV Mapping'}
+                </Button>
+              </AccessControl>
             </div>
           </div>
         </Space>

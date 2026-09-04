@@ -6,6 +6,7 @@ import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
 import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
+import { AccessControl } from '../../../../components/iam/AccessControl.jsx'
 
 const { Title, Text } = Typography
 
@@ -654,6 +655,7 @@ export default function CompanyAdminStartProcessPage() {
         } 
         description="Run matching algorithms on uploaded sales and PDF data, and review historical match batches."
         actions={
+          <AccessControl required="process:start_process:start">
           <Space size={12}>
             <Button
               icon={<ReloadOutlined />}
@@ -681,6 +683,8 @@ export default function CompanyAdminStartProcessPage() {
               Start Process
             </Button>
           </Space>
+          </AccessControl>
+        
         }
       />
 
