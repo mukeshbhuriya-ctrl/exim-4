@@ -20,7 +20,8 @@ export default function CompanyLoginPage() {
     const email =
       data?.email ?? data?.user?.email ?? pendingCredentials?.email ?? ''
     const companyName = data?.companyName ?? data?.user?.companyName ?? ''
-    saveCompanySession({ email, companyName })
+    const iamPolicies = data?.iamPolicies ?? []
+    saveCompanySession({ email, companyName, iamPolicies })
     navigate('/admin/dashboard', { replace: true })
   }
 

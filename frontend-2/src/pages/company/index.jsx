@@ -46,3 +46,4 @@ export { default as CompanyAdminConfigureSalesPage } from './admin/configure/sal
 export { default as CompanyAdminConfigureChaPage } from './admin/configure/cha.jsx'
 export { default as CompanyAdminConfigureAutomationPage } from './admin/configure/automation.jsx'
 export { default as CompanyAdminConfigureAutomationLogsPage } from './admin/configure/automationLogs.jsx'
+export { default as CompanyAdminUsersPage } from './admin/users/user_management.jsx'

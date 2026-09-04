@@ -5,6 +5,7 @@ import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
 import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
+import { AccessControl } from '../../../../components/iam/AccessControl.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -98,7 +99,7 @@ export default function CompanyAdminUploadSalesPage() {
   const [files, setFiles] = useState([])
   const [uploading, setUploading] = useState(false)
   const [downloadingExcel, setDownloadingExcel] = useState(false)
-  
+
   const [refreshKey, setRefreshKey] = useState(0)
   const [dynamicColumns, setDynamicColumns] = useState([])
 
@@ -107,7 +108,7 @@ export default function CompanyAdminUploadSalesPage() {
       if (!BACKEND_URL) return { data: [], meta: { total: 0 } }
       const p = clampSalesDataPage(page)
       const l = clampSalesDataLimit(limit)
-      
+
       try {
         const params = new URLSearchParams({
           page: String(p),
@@ -121,9 +122,9 @@ export default function CompanyAdminUploadSalesPage() {
         if (!res.ok) {
           throw new Error(data?.detail || data?.message || `Failed to load sales data (${res.status})`)
         }
-        
+
         const rows = normalizeSalesDataRows(data).filter((r) => r && typeof r === 'object')
-        
+
         setDynamicColumns(prev => {
           if (prev.length === 0 && rows.length > 0) {
             return getTableColumnsFromRows(rows)
@@ -140,7 +141,7 @@ export default function CompanyAdminUploadSalesPage() {
         if (!Number.isFinite(total)) {
           total = rows.length
         }
-        
+
         return { data: rows, meta: { total } }
       } catch (err) {
         message.error(err instanceof Error ? err.message : 'Failed to load sales data')
@@ -252,15 +253,15 @@ export default function CompanyAdminUploadSalesPage() {
 
   return (
     <AppShell sidebar={<CompanySidebar />}>
-      <PageHeader 
+      <PageHeader
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{
-              width: 44, height: 44, 
-              borderRadius: 12, 
-              background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)', 
-              display: 'flex', alignItems: 'center', justifyContent: 'center', 
-              color: '#fff', 
+              width: 44, height: 44,
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff',
               boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
               border: '1px solid rgba(255,255,255,0.2)'
             }}>
@@ -268,7 +269,7 @@ export default function CompanyAdminUploadSalesPage() {
             </div>
             <span style={{ letterSpacing: '-0.5px' }}>Sales (Excel)</span>
           </div>
-        } 
+        }
         description="Select multiple Excel files and upload them for automated processing."
         actions={
           currentView === 'upload' ? (
@@ -277,22 +278,25 @@ export default function CompanyAdminUploadSalesPage() {
             </Button>
           ) : (
             <Space size={16}>
-              <Button
-                type="primary"
-                icon={<CloudUploadOutlined />}
-                onClick={() => setCurrentView('upload')}
-                style={{ 
-                  fontWeight: 600, 
-                  height: 38, 
-                  padding: '0 20px', 
-                  borderRadius: 8,
-                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.15)',
-                  background: 'linear-gradient(180deg, #10b981 0%, #059669 100%)',
-                  border: 'none'
-                }}
-              >
-                Upload Manual
-              </Button>
+              <AccessControl required="process:sales:upload">
+                <Button
+                  type="primary"
+                  icon={<CloudUploadOutlined />}
+                  onClick={() => setCurrentView('upload')}
+                  style={{
+                    fontWeight: 600,
+                    height: 38,
+                    padding: '0 20px',
+                    borderRadius: 8,
+                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.15)',
+                    background: 'linear-gradient(180deg, #10b981 0%, #059669 100%)',
+                    border: 'none'
+                  }}
+                >
+                  Upload Manual
+                </Button>
+              </AccessControl>
+
             </Space>
           )
         }

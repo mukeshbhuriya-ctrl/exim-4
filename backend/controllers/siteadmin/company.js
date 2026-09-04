@@ -13,6 +13,9 @@ const {
   generateTemporaryPassword,
   sanitizeUser,
 } = require("#utils/user");
+const { UserRole } = require("#utils/userRole");
+const { Role } = require("#utils/role");
+const { seedSystemRolesForCompany } = require("#utils/roleSeeder");
 
 function escapeRegex(value) {
   return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -86,6 +89,16 @@ async function createCompany(req, res, next) {
 
       company.adminUserId = user._id;
       await company.save();
+
+      await seedSystemRolesForCompany(company._id);
+      const adminRole = await Role.findOne({ companyId: company._id, identifier: "ADMIN" }).lean();
+      if (adminRole) {
+        await UserRole.create({
+          companyId: company._id,
+          userId: user._id,
+          roleId: adminRole._id,
+        });
+      }
     } catch (error) {
       if (user?._id) {
         await User.findByIdAndDelete(user._id).catch(() => {});

@@ -4,7 +4,7 @@ import { clearCompanySession, getCompanySession } from '../../utils/companySessi
 import {
   LayoutDashboard, Layers, Settings, Zap, Link2, Ship, Landmark,
   BookOpen, BarChart3, FileCode2, ChevronDown, PanelLeftClose,
-  PanelLeft, LogOut, Circle, RefreshCcw
+  PanelLeft, LogOut, Circle, RefreshCcw, Shield
 } from 'lucide-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
@@ -25,12 +25,18 @@ const NAV = [
   { t: 'label', label: 'Settings' },
   {
     t: 'group', key: 'configure', label: 'Configure', icon: Settings, children: [
-      { key: '/admin/configure/sales', label: 'SAP Setup' },
-      { key: '/admin/configure/pdf', label: 'LEO Copy Mail Setup' },
-      { key: '/admin/configure/cha', label: 'ICEGATE CHA Setup' },
-      { key: '/admin/configure/dgft', label: 'DGFT Setup' },
-      { key: '/admin/configure/automation', label: 'Automation' },
-      { key: '/admin/configure/automation-logs', label: 'Automation Logs' },
+      { key: '/admin/configure/sales', label: 'SAP Setup', required: 'configure:sap_setup' },
+      { key: '/admin/configure/pdf', label: 'LEO Copy Mail Setup', required: 'configure:leo_copy_mail' },
+      { key: '/admin/configure/cha', label: 'ICEGATE CHA Setup', required: 'configure:icegate_cha' },
+      { key: '/admin/configure/dgft', label: 'DGFT Setup', required: 'configure:dgft_setup' },
+      { key: '/admin/configure/automation', label: 'Automation', required: 'configure:automation' },
+      { key: '/admin/configure/automation-logs', label: 'Automation Logs', required: 'configure:automation_logs' },
+    ]
+  },
+  { t: 'label', label: 'Administration' },
+  {
+    t: 'group', key: 'admin', label: 'Administration', icon: Shield, children: [
+      { key: '/admin/users', label: 'User Management', required: 'admin:users:view' },
     ]
   },
   { t: 'label', label: 'Operations' },
@@ -87,6 +93,53 @@ function findGroup(p) {
   return null
 }
 
+function hasPermission(session, requiredResource) {
+  if (!session || !session.iamPolicies || !Array.isArray(session.iamPolicies)) return false;
+  
+  let isAllowed = false;
+  
+  for (const policy of session.iamPolicies) {
+    const matchesResource = policy.Resource && policy.Resource.some(r => 
+      r === '*' || r === requiredResource || (r.endsWith('*') && requiredResource.startsWith(r.slice(0, -1)))
+    );
+    
+    if (matchesResource) {
+      if (policy.Effect === 'Allow') isAllowed = true;
+      if (policy.Effect === 'Deny') return false;
+    }
+  }
+  return isAllowed;
+}
+
+function getFilteredNav(nav, session) {
+  const filteredNav = nav.map(group => {
+    if (group.children) {
+      const allowedChildren = group.children.filter(child => {
+        if (!child.required) return true;
+        return hasPermission(session, child.required);
+      });
+      return { ...group, children: allowedChildren };
+    }
+    if (group.required) {
+      return hasPermission(session, group.required) ? group : null;
+    }
+    return group;
+  }).filter(group => {
+    if (!group) return false;
+    if (group.t === 'group') return group.children && group.children.length > 0;
+    return true;
+  });
+
+  // Clean up consecutive or trailing labels
+  return filteredNav.filter((n, i, arr) => {
+    if (n.t === 'label') {
+      const next = arr[i + 1];
+      return next && next.t !== 'label';
+    }
+    return true;
+  });
+}
+
 /* ═══════════════════════════════════════════════════════════
    Main Sidebar Component - using guaranteed inline styles for colors
    ═══════════════════════════════════════════════════════════ */
@@ -100,6 +153,7 @@ export default function CompanySidebar() {
   })
   const [session, setSession] = useState(() => getCompanySession())
   const prevGroup = useRef(findGroup(pathname))
+  const filteredNav = getFilteredNav(NAV, session)
 
   // Theme constants
   const COLORS = {
@@ -207,7 +261,7 @@ export default function CompanySidebar() {
         scrollbarWidth: 'thin',
         scrollbarColor: `${COLORS.border} transparent`
       }}>
-        {NAV.map((n, i) => {
+        {filteredNav.map((n, i) => {
           // Section label
           if (n.t === 'label') {
             if (collapsed) return <div key={i} style={{ margin: '16px auto', height: '1px', width: '24px', backgroundColor: COLORS.border }} />

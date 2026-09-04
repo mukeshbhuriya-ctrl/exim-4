@@ -6,6 +6,7 @@ import CompanySidebar from '../../../../components/company/sidebar.jsx'
 import AppShell from '../../../../components/layout/AppShell.jsx'
 import PageHeader from '../../../../components/common/PageHeader.jsx'
 import ProDataTable from '../../../../components/shared/ProDataTable.jsx'
+import { AccessControl } from '../../../../components/iam/AccessControl.jsx'
 
 const { Content } = Layout
 const { Title, Text } = Typography
@@ -373,6 +374,7 @@ export default function CompanyAdminUploadPdfPage() {
               Cancel & Back to List
             </Button>
           ) : (
+            <AccessControl required="process:leo_copy:upload">
             <Space size={16} split={<div style={{ width: 1, height: 24, background: 'var(--exim-border-light)' }} />}>
               <Space size={8} align="center">
                 {/* <Text type="secondary" style={{ fontSize: 13 }}>Mails to process:</Text> */}
@@ -424,6 +426,7 @@ export default function CompanyAdminUploadPdfPage() {
                 Upload Manual
               </Button>
             </Space>
+            </AccessControl>
           )
         }
       />

@@ -25,7 +25,7 @@ async function requireCompanyAdmin(req, res, next) {
       });
     }
 
-    if (user.role !== "admin") {
+    if (user.role !== "admin" && user.role !== "user") {
       return res.status(403).json({
         success: false,
         message: "Company admin access is required.",

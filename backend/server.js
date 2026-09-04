@@ -39,6 +39,8 @@ const companyAdminConfigureSalesRoutes = require("#routes/company/admin/configur
 const companyAdminConfigureAutomationRoutes = require("#routes/company/admin/configure/automation.routes");
 const companyAdminDashboardRoutes = require("#routes/company/admin/dashboard.routes");
 const companyAdminSalesDataCleanRoutes = require("#routes/company/admin/Initialization/sales_data_clean.routes");
+const companyAdminRolesRoutes = require("#routes/company/admin/roles.routes");
+const companyAdminUsersRoutes = require("#routes/company/admin/users.routes");
 
 
 const corsMiddleware = require("#utils/cors");
@@ -49,6 +51,7 @@ const {
   ensureDefaultSiteAdmin,
   getSeedSiteAdminConfig,
 } = require("#utils/siteadmin");
+const { seedSystemRoles } = require("#utils/roleSeeder");
 
 const app = express();
 const port = Number(process.env.PORT) || 5000;
@@ -103,6 +106,8 @@ app.use(
   "/api/company/admin/initialization/sales-data-clean",
   companyAdminSalesDataCleanRoutes
 );
+app.use("/api/company/admin/roles", companyAdminRolesRoutes);
+app.use("/api/company/admin/users", companyAdminUsersRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
@@ -134,6 +139,9 @@ async function startServer() {
   await migrateAndDropLegacyCredentialCollections();
   const seededSiteAdmin = await ensureDefaultSiteAdmin();
   const seedConfig = getSeedSiteAdminConfig();
+  
+  // Seed Roles for all existing companies
+  await seedSystemRoles();
 
   const server = app.listen(port, () => {
     console.log(`Server listening on http://localhost:${port}`);

@@ -43,6 +43,7 @@ import {
   CompanyAdminConfigureChaPage,
   CompanyAdminConfigureAutomationPage,
   CompanyAdminConfigureAutomationLogsPage,
+  CompanyAdminUsersPage,
 } from './pages/company/index.jsx'
 
 const protectedRoutes: Array<{ path: string; element: ReactNode }> = [
@@ -354,6 +355,15 @@ export default function App() {
         element={
           <CompanyProtectedRoute>
             <CompanyAdminConfigureAutomationLogsPage />
+          </CompanyProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/admin/users"
+        element={
+          <CompanyProtectedRoute>
+            <CompanyAdminUsersPage />
           </CompanyProtectedRoute>
         }
       />

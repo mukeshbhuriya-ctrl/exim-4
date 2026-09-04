@@ -7,11 +7,28 @@ const {
 const { hashCompanyUserPassword } = require("#utils/companyUserPassword");
 const { Company } = require("#utils/company");
 const { User, sanitizeUser } = require("#utils/user");
+const { getPoliciesForRole } = require("#utils/iamPolicies");
+const { UserRole } = require("#utils/userRole");
 
 async function resolveCompanyName(companyId) {
   if (!companyId) return "";
   const company = await Company.findById(companyId).select("name").lean();
   return String(company?.name || "").trim();
+}
+
+async function resolveUserPolicies(user) {
+  try {
+    const mapping = await UserRole.findOne({ userId: user._id, companyId: user.companyId, isActive: true })
+      .populate('roleId')
+      .lean();
+    if (mapping && mapping.roleId && mapping.roleId.policies) {
+      return mapping.roleId.policies;
+    }
+  } catch (err) {
+    console.error("Error resolving user policies from DB:", err);
+  }
+  // Fallback to legacy static mapping
+  return getPoliciesForRole(user.role);
 }
 
 async function buildCompanyLoginResponse(user) {
@@ -68,6 +85,7 @@ async function loginCompanyUser(req, res, next) {
     setCompanyUserAuthCookie(res, token);
 
     const profile = await buildCompanyLoginResponse(user);
+    const iamPolicies = await resolveUserPolicies(user);
 
     return res.status(200).json({
       success: true,
@@ -77,6 +95,7 @@ async function loginCompanyUser(req, res, next) {
       email: profile.email,
       companyName: profile.companyName,
       user: profile.user,
+      iamPolicies,
     });
   } catch (error) {
     return next(error);
@@ -138,6 +157,7 @@ async function changeDefaultPassword(req, res, next) {
     setCompanyUserAuthCookie(res, token);
 
     const profile = await buildCompanyLoginResponse(user);
+    const iamPolicies = await resolveUserPolicies(user);
 
     return res.status(200).json({
       success: true,
@@ -147,6 +167,7 @@ async function changeDefaultPassword(req, res, next) {
       email: profile.email,
       companyName: profile.companyName,
       user: profile.user,
+      iamPolicies,
     });
   } catch (error) {
     return next(error);
