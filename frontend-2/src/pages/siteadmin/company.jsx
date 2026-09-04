@@ -1,96 +1,51 @@
-import { useEffect, useState } from 'react'
-import {
-  Alert,
-  Button,
-  Card,
-  Form,
-  Input,
-  Layout,
-  List,
-  Modal,
-  Pagination,
-  Space,
-  Typography,
-  message,
-} from 'antd'
+import React, { useState, useCallback } from 'react'
+import { Button, Form, Input, notification, Dropdown } from 'antd'
+import { Plus, Building2, MoreHorizontal } from 'lucide-react'
 import SiteAdminSidebar from '../../components/siteadmin/sidebar.jsx'
 import AppShell from '../../components/layout/AppShell.jsx'
+import PageHeader from '../../components/common/PageHeader.jsx'
+import ProDataTable from '../../components/shared/ProDataTable.jsx'
 
-const { Content } = Layout
-const { Title, Text } = Typography
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
 
 export default function SiteAdminCompanyPage() {
   const [form] = Form.useForm()
-  const [companies, setCompanies] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [createModalOpen, setCreateModalOpen] = useState(false)
-  const [error, setError] = useState('')
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-    totalPages: 0,
-  })
+  const [currentView, setCurrentView] = useState('list')
   const [detailCompany, setDetailCompany] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
-  const fetchCompanies = async (page = 1, limit = 10) => {
-    setLoading(true)
-    setError('')
-
+  const fetchData = useCallback(async ({ page = 1, limit = 15, search }) => {
     try {
       const params = new URLSearchParams({
         page: String(page),
         limit: String(limit),
       })
-      const response = await fetch(`${BACKEND_URL}/api/siteadmin/company/?${params}`, {
+      if (search) params.append('search', search)
+
+      const res = await fetch(`${BACKEND_URL}/api/siteadmin/company/?${params}`, {
         method: 'GET',
         credentials: 'include',
       })
-
-      const data = await response.json().catch(() => ({}))
-
-      if (!response.ok) {
-        throw new Error(data?.message || 'Failed to fetch company list')
+      const data = await res.json()
+      
+      if (res.ok) {
+        const list = data.companies ?? (Array.isArray(data) ? data : data?.data ?? [])
+        let total = list.length
+        if (data.pagination && typeof data.pagination === 'object') {
+          total = data.pagination.total ?? list.length
+        }
+        return { data: list, meta: { total } }
       }
-
-      const list =
-        data.companies ?? (Array.isArray(data) ? data : data?.data ?? [])
-      setCompanies(list)
-
-      if (data.pagination && typeof data.pagination === 'object') {
-        setPagination({
-          page: data.pagination.page ?? page,
-          limit: data.pagination.limit ?? limit,
-          total: data.pagination.total ?? list.length,
-          totalPages: data.pagination.totalPages ?? 1,
-        })
-      } else {
-        setPagination((prev) => ({
-          ...prev,
-          page,
-          limit,
-          total: list.length,
-          totalPages: Math.max(1, Math.ceil(list.length / limit)),
-        }))
-      }
+      return { data: [], meta: { total: 0 } }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch company list')
-    } finally {
-      setLoading(false)
+      notification.error({ message: 'Failed to fetch companies' })
+      return { data: [], meta: { total: 0 } }
     }
-  }
-
-  useEffect(() => {
-    fetchCompanies(1, pagination.limit)
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load only
   }, [])
 
   const handleCreateCompany = async (values) => {
-    setCreating(true)
-    setError('')
-
+    setSubmitting(true)
     try {
       const payload = {
         name: values.name.trim(),
@@ -100,9 +55,7 @@ export default function SiteAdminCompanyPage() {
 
       const response = await fetch(`${BACKEND_URL}/api/siteadmin/company/create`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(payload),
       })
@@ -113,192 +66,195 @@ export default function SiteAdminCompanyPage() {
         throw new Error(data?.message || 'Failed to create company')
       }
 
-      message.success('Company created successfully')
-      setCreateModalOpen(false)
+      notification.success({ message: 'Company created successfully' })
+      setCurrentView('list')
       form.resetFields()
-      fetchCompanies(pagination.page, pagination.limit)
+      setRefreshKey(prev => prev + 1)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create company')
+      notification.error({ message: err instanceof Error ? err.message : 'Failed to create company' })
     } finally {
-      setCreating(false)
+      setSubmitting(false)
     }
   }
 
+  const columns = [
+    { 
+      title: 'Company Name', 
+      dataIndex: 'name', 
+      key: 'name',
+      render: (val, r) => val || r.companyName || '-'
+    },
+    { 
+      title: 'Admin Name', 
+      key: 'adminName',
+      render: (_, r) => r.adminUser?.name ?? '—'
+    },
+    { 
+      title: 'Admin Email', 
+      key: 'adminEmail',
+      render: (_, r) => r.adminUser?.email ?? '—'
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      width: 100,
+      render: (_, r) => {
+        const menuItems = [
+          {
+            key: 'view',
+            label: 'View Details',
+            onClick: () => {
+              setDetailCompany(r)
+              setCurrentView('view')
+            }
+          }
+        ]
+
+        return (
+          <Dropdown menu={{ items: menuItems }} trigger={['click']} placement="bottomRight">
+            <Button 
+              type="text" 
+              icon={<MoreHorizontal size={16} />} 
+              className="text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-md flex items-center justify-center w-8 h-8"
+            />
+          </Dropdown>
+        )
+      }
+    }
+  ]
+
   return (
     <AppShell sidebar={<SiteAdminSidebar />} portalType="siteadmin">
-          <Space direction="vertical" size="large" style={{ width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
-              <div>
-                <Title level={3} style={{ margin: 0 }}>
-                  Company
-                </Title>
-                <Text type="secondary">Create and view all companies.</Text>
-              </div>
-              <Button type="primary" onClick={() => setCreateModalOpen(true)}>
-                Create Company
-              </Button>
-            </div>
+      <PageHeader
+        title={
+          currentView === 'create' ? 'Create Company' :
+          currentView === 'view' ? 'Company Details' :
+          'Companies'
+        }
+        description={
+          currentView === 'create' ? 'Register a new company account' :
+          currentView === 'view' ? 'Detailed information about this company' :
+          'Manage all company accounts across the platform.'
+        }
+        actions={
+          currentView === 'list' ? null : (
+            <Button onClick={() => setCurrentView('list')} className="font-medium h-9 rounded-md">
+              Back to List
+            </Button>
+          )
+        }
+      />
 
-            {error ? <Alert type="error" message={error} showIcon /> : null}
-
-            <Modal
-              title="Create Company"
-              open={createModalOpen}
-              onCancel={() => {
-                setCreateModalOpen(false)
-                setError('')
-                form.resetFields()
-              }}
-              footer={null}
-              destroyOnClose
+      <div className="flex-1 flex flex-col min-h-0">
+        {currentView === 'list' ? (
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden bg-white border border-slate-200 rounded-lg">
+            <ProDataTable
+              columns={columns}
+              fetchData={fetchData}
+              refreshKey={refreshKey}
+              rowKey={(r) => r.id || r._id || Math.random().toString()}
+              pagination={{ pageSize: 15 }}
+              customToolbarActions={
+                <Button 
+                  type="primary" 
+                  onClick={() => setCurrentView('create')} 
+                  className="font-semibold flex items-center gap-2 h-9 rounded-md bg-blue-600 hover:bg-blue-700 border-none shadow-none"
+                >
+                  <Plus size={16} /> Add Company
+                </Button>
+              }
+            />
+          </div>
+        ) : currentView === 'create' ? (
+          <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-lg p-8 overflow-y-auto">
+            <Form
+              form={form}
+              layout="vertical"
+              onFinish={handleCreateCompany}
+              autoComplete="off"
             >
-              <Form
-                form={form}
-                layout="vertical"
-                onFinish={handleCreateCompany}
-                autoComplete="off"
-              >
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Form.Item
-                  label="Company Name"
+                  label={<span className="font-medium text-slate-700">Company Name</span>}
                   name="name"
                   rules={[{ required: true, whitespace: true, message: 'Please enter company name' }]}
                 >
-                  <Input placeholder="Enter company name" />
+                  <Input placeholder="Enter company name" className="rounded-md h-10 border-slate-200" />
                 </Form.Item>
 
                 <Form.Item
-                  label="User Name"
+                  label={<span className="font-medium text-slate-700">User Name</span>}
                   name="username"
                   rules={[{ required: true, whitespace: true, message: 'Please enter user name' }]}
                 >
-                  <Input placeholder="Enter user name" />
+                  <Input placeholder="Enter user name" className="rounded-md h-10 border-slate-200" />
                 </Form.Item>
 
                 <Form.Item
-                  label="Email"
+                  label={<span className="font-medium text-slate-700">Admin Email</span>}
                   name="email"
                   rules={[
                     { required: true, whitespace: true, message: 'Please enter email' },
                     { type: 'email', message: 'Please enter a valid email' },
                   ]}
                 >
-                  <Input placeholder="Enter email" />
+                  <Input placeholder="Enter email address" className="rounded-md h-10 border-slate-200" />
                 </Form.Item>
-
-                <Button type="primary" htmlType="submit" loading={creating} block>
-                  Create
-                </Button>
-              </Form>
-            </Modal>
-
-            <Card
-              title="Company List"
-              extra={
-                <Button onClick={() => fetchCompanies(pagination.page, pagination.limit)}>
-                  Refresh
-                </Button>
-              }
-            >
-              <List
-                bordered
-                loading={loading}
-                dataSource={companies}
-                locale={{ emptyText: 'No companies found' }}
-                renderItem={(item) => {
-                  const companyName = item?.name || item?.companyName || '-'
-                  const admin = item?.adminUser
-                  const adminName = admin?.name ?? '—'
-                  const adminEmail = admin?.email ?? '—'
-
-                  return (
-                    <List.Item
-                      actions={[
-                        <Button type="primary" key="view" onClick={() => setDetailCompany(item)}>
-                          View
-                        </Button>,
-                      ]}
-                    >
-                      <List.Item.Meta
-                        title={<Text strong>{companyName}</Text>}
-                        description={
-                          <Space direction="vertical" size={2}>
-                            <Text type="secondary">
-                              Admin: {adminName}
-                            </Text>
-                            <Text type="secondary">{adminEmail}</Text>
-                          </Space>
-                        }
-                      />
-                    </List.Item>
-                  )
-                }}
-              />
-              <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}>
-                <Pagination
-                  current={pagination.page}
-                  pageSize={pagination.limit}
-                  total={pagination.total}
-                  showSizeChanger
-                  pageSizeOptions={[10, 20, 50]}
-                  showTotal={(total, range) =>
-                    `${range[0]}-${range[1]} of ${total} companies`
-                  }
-                  onChange={(page, pageSize) => {
-                    fetchCompanies(page, pageSize)
-                  }}
-                />
               </div>
-            </Card>
 
-            <Modal
-              title="Company details"
-              open={!!detailCompany}
-              onCancel={() => setDetailCompany(null)}
-              footer={[
-                <Button key="close" type="primary" onClick={() => setDetailCompany(null)}>
-                  Close
-                </Button>,
-              ]}
-              destroyOnClose
-            >
-              {detailCompany ? (
-                <Space direction="vertical" size="small" style={{ width: '100%' }}>
+              <div className="pt-6 flex justify-end border-t border-slate-100 mt-2">
+                <Button 
+                  type="primary" 
+                  htmlType="submit" 
+                  loading={submitting} 
+                  className="font-semibold h-10 px-6 rounded-md bg-blue-600 hover:bg-blue-700 border-none shadow-none"
+                >
+                  Create Company
+                </Button>
+              </div>
+            </Form>
+          </div>
+        ) : currentView === 'view' && detailCompany ? (
+          <div className="flex-1 min-h-0 bg-white border border-slate-200 rounded-lg p-8 overflow-y-auto">
+            <div className="space-y-6 max-w-4xl">
+              <div className="flex items-center gap-4 border-b border-slate-200 pb-4">
+                <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shrink-0">
+                  <Building2 size={24} />
+                </div>
+                <div>
+                  <div className="text-lg font-bold text-slate-900 leading-tight">
+                    {detailCompany.name || detailCompany.companyName || '—'}
+                  </div>
+                  <div className="text-sm text-slate-500 mt-0.5">
+                    ID: {detailCompany.id || detailCompany._id}
+                  </div>
+                </div>
+              </div>
+
+              {detailCompany.adminUser && (
+                <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <Text type="secondary">Company name</Text>
-                    <div>
-                      <Text strong>
-                        {detailCompany.name || detailCompany.companyName || '—'}
-                      </Text>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                      Admin Name
+                    </div>
+                    <div className="text-sm font-medium text-slate-800">
+                      {detailCompany.adminUser.name ?? '—'}
                     </div>
                   </div>
-                  {detailCompany.id || detailCompany._id ? (
-                    <div>
-                      <Text type="secondary">Company ID</Text>
-                      <div>
-                        <Text>{detailCompany.id || detailCompany._id}</Text>
-                      </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+                      Admin Email
                     </div>
-                  ) : null}
-                  {detailCompany.adminUser ? (
-                    <>
-                      <div>
-                        <Text type="secondary">Admin name</Text>
-                        <div>
-                          <Text strong>{detailCompany.adminUser.name ?? '—'}</Text>
-                        </div>
-                      </div>
-                      <div>
-                        <Text type="secondary">Admin email</Text>
-                        <div>
-                          <Text>{detailCompany.adminUser.email ?? '—'}</Text>
-                        </div>
-                      </div>
-                    </>
-                  ) : null}
-                </Space>
-              ) : null}
-            </Modal>
-          </Space>
+                    <div className="text-sm font-medium text-slate-800">
+                      {detailCompany.adminUser.email ?? '—'}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : null}
+      </div>
     </AppShell>
   )
 }

@@ -22,8 +22,8 @@ export default function StatCard({
     <div
       onClick={onClick}
       className={cn(
-        'relative overflow-hidden rounded-xl border border-slate-200/60 bg-white p-5 shadow-sm transition-all duration-200',
-        onClick && 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md hover:border-primary-200',
+        'relative overflow-hidden rounded-lg border border-slate-200 bg-white p-5',
+        onClick && 'cursor-pointer transition-colors duration-200 hover:bg-slate-50 hover:border-slate-300',
         className,
       )}
       style={style}

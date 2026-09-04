@@ -1,24 +1,11 @@
-import { EyeOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
-import {
-  Alert,
-  Button,
-  DatePicker,
-  Descriptions,
-  Layout,
-  Modal,
-  Select,
-  Space,
-  Table,
-  Typography,
-  message,
-} from 'antd'
-import dayjs from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import dayjs from 'dayjs'
+import { Button, DatePicker, Select, message } from 'antd'
+import { Eye, Search, RefreshCcw, FileText, AlertCircle, Building2, Calendar, FileSpreadsheet } from 'lucide-react'
 import SiteAdminSidebar from '../../components/siteadmin/sidebar.jsx'
 import AppShell from '../../components/layout/AppShell.jsx'
-
-const { Content } = Layout
-const { Title, Text } = Typography
+import PageHeader from '../../components/common/PageHeader.jsx'
+import ProDataTable from '../../components/shared/ProDataTable.jsx'
 
 function normalizeCompanies(payload) {
   if (Array.isArray(payload)) return payload
@@ -66,6 +53,7 @@ function normalizeDetailRows(payload) {
 export default function SiteAdminViewBillesPage() {
   const BACKEND_URL = (import.meta.env.VITE_BACKEND_URL || '').replace(/\/$/, '')
 
+  const [currentView, setCurrentView] = useState('list')
   const [companies, setCompanies] = useState([])
   const [companyId, setCompanyId] = useState(undefined)
   const [dateRange, setDateRange] = useState(() => [dayjs().startOf('month'), dayjs().endOf('month')])
@@ -74,7 +62,6 @@ export default function SiteAdminViewBillesPage() {
   const [loadingReports, setLoadingReports] = useState(false)
   const [error, setError] = useState('')
 
-  const [detailOpen, setDetailOpen] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailHeader, setDetailHeader] = useState(null)
   const [detailRows, setDetailRows] = useState([])
@@ -106,7 +93,7 @@ export default function SiteAdminViewBillesPage() {
 
   const handleSearch = useCallback(async () => {
     if (!BACKEND_URL) {
-      message.error('Backend URL is not configured (VITE_BACKEND_URL).')
+      message.error('Backend URL is not configured.')
       return
     }
     const [start, end] = dateRange || []
@@ -139,10 +126,10 @@ export default function SiteAdminViewBillesPage() {
   const openDetail = useCallback(
     async (id) => {
       if (!BACKEND_URL || !id) return
-      setDetailOpen(true)
       setDetailLoading(true)
       setDetailHeader(null)
       setDetailRows([])
+      setCurrentView('view')
       try {
         const res = await fetch(`${BACKEND_URL}/api/siteadmin/billing/detailed-billing-report/${id}`, {
           method: 'GET',
@@ -165,6 +152,7 @@ export default function SiteAdminViewBillesPage() {
         setDetailRows(normalizeDetailRows(data).filter((r) => r && typeof r === 'object'))
       } catch (e) {
         message.error(e instanceof Error ? e.message : 'Failed to load detailed billing report')
+        setCurrentView('list')
       } finally {
         setDetailLoading(false)
       }
@@ -181,128 +169,198 @@ export default function SiteAdminViewBillesPage() {
     [companies],
   )
 
+  const reportFetchData = useCallback(async ({ page = 1, limit = 15 }) => {
+    const start = (page - 1) * limit
+    return { data: rows.slice(start, start + limit), meta: { total: rows.length } }
+  }, [rows])
+
+  const detailFetchData = useCallback(async ({ page = 1, limit = 15 }) => {
+    const start = (page - 1) * limit
+    return { data: detailRows.slice(start, start + limit), meta: { total: detailRows.length } }
+  }, [detailRows])
+
   const reportColumns = [
-    { title: 'Index', key: 'index', width: 80, render: (_, __, i) => i + 1 },
-    { title: 'companyName', dataIndex: 'companyName', key: 'companyName', width: 180 },
-    { title: 'feeNoteNo', dataIndex: 'feeNoteNo', key: 'feeNoteNo', width: 160 },
-    { title: 'dayKey', dataIndex: 'dayKey', key: 'dayKey', width: 130 },
-    { title: 'perRowAmount', dataIndex: 'perRowAmount', key: 'perRowAmount', width: 130 },
-    { title: 'totalAmount', dataIndex: 'totalAmount', key: 'totalAmount', width: 130 },
-    { title: 'rowsCount', dataIndex: 'rowsCount', key: 'rowsCount', width: 110 },
-    { title: 'createdAt', dataIndex: 'createdAt', key: 'createdAt', width: 180 },
-    { title: 'updatedAt', dataIndex: 'updatedAt', key: 'updatedAt', width: 180 },
+    { title: 'Company Name', dataIndex: 'companyName', key: 'companyName' },
+    { title: 'Fee Note No', dataIndex: 'feeNoteNo', key: 'feeNoteNo' },
+    { title: 'Day Key', dataIndex: 'dayKey', key: 'dayKey' },
+    { title: 'Per Row Amount', dataIndex: 'perRowAmount', key: 'perRowAmount' },
+    { title: 'Total Amount', dataIndex: 'totalAmount', key: 'totalAmount' },
+    { title: 'Rows Count', dataIndex: 'rowsCount', key: 'rowsCount' },
+    { title: 'Created At', dataIndex: 'createdAt', key: 'createdAt' },
     {
       title: 'Action',
       key: 'action',
       width: 90,
       render: (_, row) => (
-        <Button type="link" icon={<EyeOutlined />} onClick={() => openDetail(row?.id || row?._id)}>
-          View
-        </Button>
+        <Button 
+          type="text" 
+          icon={<Eye size={16} />} 
+          onClick={() => openDetail(row?.id || row?._id)}
+          className="text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-md flex items-center justify-center w-8 h-8"
+        />
       ),
     },
   ]
 
   const detailColumns = [
-    { title: 'Index', key: 'index', width: 80, render: (_, __, i) => i + 1 },
-    { title: 'sbnumber', dataIndex: 'sbnumber', key: 'sbnumber', width: 160 },
-    { title: 'sbdate', dataIndex: 'sbdate', key: 'sbdate', width: 140 },
-    { title: 'sbport', dataIndex: 'sbport', key: 'sbport', width: 180 },
-    { title: 'billingstatus', dataIndex: 'billingstatus', key: 'billingstatus', width: 160 },
+    { title: 'SB Number', dataIndex: 'sbnumber', key: 'sbnumber' },
+    { title: 'SB Date', dataIndex: 'sbdate', key: 'sbdate' },
+    { title: 'SB Port', dataIndex: 'sbport', key: 'sbport' },
+    { title: 'Billing Status', dataIndex: 'billingstatus', key: 'billingstatus' },
   ]
 
   return (
     <AppShell sidebar={<SiteAdminSidebar />} portalType="siteadmin">
-          <Space direction="vertical" size="large" style={{ width: '100%', minWidth: 0 }}>
-            <div>
-              <Title level={3} style={{ margin: 0 }}>
-                View Billes
-              </Title>
-              <Text type="secondary">View billing reports and detailed billed rows.</Text>
-            </div>
+      <PageHeader
+        title={currentView === 'view' ? 'Billing Report Details' : 'View Bills'}
+        description={
+          currentView === 'view' 
+          ? 'Detailed breakdown of the billed shipping bills for this report.' 
+          : 'Search and view billing reports and detailed billed rows.'
+        }
+        actions={
+          currentView === 'view' && (
+            <Button onClick={() => setCurrentView('list')} className="font-medium h-9 rounded-md">
+              Back to List
+            </Button>
+          )
+        }
+      />
 
-            {error ? <Alert type="error" message={error} showIcon /> : null}
+      <div className="flex-1 flex flex-col min-h-0 overflow-y-auto p-1 pb-10 space-y-6">
+        {!BACKEND_URL && (
+          <div className="bg-red-50 border border-red-200 text-red-600 rounded-md p-4 flex items-center gap-3">
+            <AlertCircle size={20} />
+            <span className="font-medium text-sm">VITE_BACKEND_URL is not configured.</span>
+          </div>
+        )}
+        
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-600 rounded-md p-4 flex items-center gap-3">
+            <AlertCircle size={20} />
+            <span className="font-medium text-sm">{error}</span>
+          </div>
+        )}
 
-            <Space wrap style={{ width: '100%' }}>
-              <Select
-                style={{ minWidth: 260 }}
-                placeholder="Select company (optional)"
-                value={companyId}
-                onChange={setCompanyId}
-                options={companyOptions}
-                loading={loadingCompanies}
-                allowClear
-                showSearch
-                optionFilterProp="label"
-              />
-              <DatePicker.RangePicker
-                value={dateRange}
-                onChange={(v) => setDateRange(v)}
-                format="YYYY-MM-DD"
-              />
-              <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch} loading={loadingReports}>
-                Search
-              </Button>
-              <Button icon={<ReloadOutlined />} onClick={fetchCompanies} loading={loadingCompanies}>
-                Refresh Companies
-              </Button>
-            </Space>
+        {currentView === 'list' ? (
 
-            <div style={{ width: '100%', maxWidth: '100%', minWidth: 0, overflowX: 'auto', overflowY: 'hidden' }}>
-              <Table
-                rowKey={(r, i) => String(r?.id || r?._id || `billing-report-${i}`)}
-                columns={reportColumns}
-                dataSource={rows}
-                loading={loadingReports}
-                pagination={{ pageSize: 25, showSizeChanger: true }}
-                scroll={{ x: 'max-content' }}
-                size="small"
-              />
-            </div>
 
-            <Modal
-              title="Detailed Billing Report"
-              open={detailOpen}
-              onCancel={() => setDetailOpen(false)}
-              footer={null}
-              width={1100}
-              destroyOnClose
-            >
-              <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-                {detailHeader ? (
-                  <Descriptions bordered size="small" column={2}>
-                    <Descriptions.Item label="company">
-                      {String(detailHeader?.companyName ?? detailHeader?.companyId ?? '—')}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="feeNoteNo">
-                      {String(detailHeader?.feeNoteNo ?? '—')}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="dayKey">
-                      {String(detailHeader?.dayKey ?? '—')}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="perRowAmount">
-                      {String(detailHeader?.perRowAmount ?? '—')}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="totalAmount">
-                      {String(detailHeader?.totalAmount ?? '—')}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="rowsCount">
-                      {String(detailHeader?.rowsCount ?? detailRows.length)}
-                    </Descriptions.Item>
-                  </Descriptions>
-                ) : null}
-                <Table
-                  rowKey={(r, i) => `${r?.sbnumber || 'sb'}-${r?.sbdate || 'date'}-${r?.sbport || 'port'}-${i}`}
-                  columns={detailColumns}
-                  dataSource={detailRows}
-                  loading={detailLoading}
-                  pagination={{ pageSize: 20, showSizeChanger: true }}
-                  scroll={{ x: 'max-content' }}
-                  size="small"
+          <>
+            <div className="bg-white border border-slate-200 rounded-lg flex flex-col min-h-[400px]">
+              <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                <div className="font-semibold text-slate-800">Billing Reports ({rows.length})</div>
+                <FileText size={18} className="text-slate-400" />
+              </div>
+              <div className="flex-1 min-h-0">
+                <ProDataTable
+                  columns={reportColumns}
+                  fetchData={reportFetchData}
+                  refreshKey={rows.length}
+                  rowKey={(r, i) => String(r?.id || r?._id || `billing-report-${i}`)}
+                  pagination={{ pageSize: 15 }}
+                  customToolbarActions={
+                    <div className="flex items-center gap-2 ml-4">
+                      <Select
+                        style={{ width: 180, height: 36 }}
+                        placeholder="All Companies"
+                        value={companyId}
+                        onChange={setCompanyId}
+                        options={companyOptions}
+                        loading={loadingCompanies}
+                        allowClear
+                        showSearch
+                        optionFilterProp="label"
+                      />
+                      <DatePicker.RangePicker
+                        style={{ width: 240, height: 36 }}
+                        className="border-slate-200"
+                        value={dateRange}
+                        onChange={(v) => setDateRange(v)}
+                        format="YYYY-MM-DD"
+                      />
+                      <Button
+                        type="primary"
+                        className="bg-blue-600 hover:bg-blue-700 font-medium rounded-md border-none shadow-none flex items-center gap-1.5 h-9 px-4"
+                        loading={loadingReports}
+                        onClick={handleSearch}
+                        icon={<Search size={16} />}
+                      >
+                        Search
+                      </Button>
+                      <button
+                        type="button"
+                        style={{ height: 36, width: 36 }}
+                        className="rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+                        onClick={fetchCompanies} 
+                        title="Refresh Companies"
+                        disabled={loadingCompanies}
+                      >
+                        <RefreshCcw size={16} className={loadingCompanies ? 'animate-spin' : ''} />
+                      </button>
+                    </div>
+                  }
                 />
-              </Space>
-            </Modal>
-          </Space>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="space-y-6">
+            <div className="bg-white border border-slate-200 rounded-lg p-6">
+              <div className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-5">
+                Report Summary
+              </div>
+              {detailLoading ? (
+                <div className="text-slate-500 py-4">Loading details...</div>
+              ) : detailHeader ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-6 gap-x-8">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5"><Building2 size={12}/> Company</div>
+                    <div className="font-medium text-slate-800">{String(detailHeader?.companyName ?? detailHeader?.companyId ?? '—')}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5"><FileText size={12}/> Fee Note No</div>
+                    <div className="font-medium text-slate-800">{String(detailHeader?.feeNoteNo ?? '—')}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-1.5"><Calendar size={12}/> Day Key</div>
+                    <div className="font-medium text-slate-800">{String(detailHeader?.dayKey ?? '—')}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Per Row Amount</div>
+                    <div className="font-medium text-slate-800">{String(detailHeader?.perRowAmount ?? '—')}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Total Amount</div>
+                    <div className="font-medium text-slate-800">{String(detailHeader?.totalAmount ?? '—')}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Rows Count</div>
+                    <div className="font-medium text-slate-800">{String(detailHeader?.rowsCount ?? detailRows.length)}</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-slate-500 py-4">No header details available.</div>
+              )}
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-lg flex flex-col min-h-[400px]">
+              <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                <div className="font-semibold text-slate-800">Billed Shipping Bills ({detailRows.length})</div>
+                <FileSpreadsheet size={18} className="text-slate-400" />
+              </div>
+              <div className="flex-1 min-h-0">
+                <ProDataTable
+                  columns={detailColumns}
+                  fetchData={detailFetchData}
+                  refreshKey={detailRows.length + (detailLoading ? 1 : 0)}
+                  rowKey={(r, i) => `${r?.sbnumber || 'sb'}-${r?.sbdate || 'date'}-${r?.sbport || 'port'}-${i}`}
+                  pagination={{ pageSize: 15 }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </AppShell>
   )
 }

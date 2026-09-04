@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Alert, Button, Card, Form, Input, Typography } from 'antd'
-import { LockOutlined, MailOutlined, SafetyCertificateOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Form, Input, Typography, ConfigProvider } from 'antd'
+import { LockOutlined, MailOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 
 const { Title, Text } = Typography
@@ -42,14 +42,36 @@ export default function SiteAdminLoginPage() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)',
+    <ConfigProvider
+      theme={{
+        token: {
+          colorPrimary: '#1B4DFF',
+          borderRadius: 6,
+          colorTextHeading: '#1e293b', // slate-800
+          colorText: '#475569', // slate-600
+        },
+        components: {
+          Button: {
+            controlHeightLG: 44,
+            fontWeight: 500,
+          },
+          Input: {
+            controlHeightLG: 44,
+          },
+          Card: {
+            paddingLG: 40,
+          }
+        },
       }}
     >
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)',
+        }}
+      >
       <div
         style={{
           display: 'flex',
@@ -164,5 +186,6 @@ export default function SiteAdminLoginPage() {
         </Card>
       </div>
     </div>
+    </ConfigProvider>
   )
 }

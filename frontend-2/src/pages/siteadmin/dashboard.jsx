@@ -1,17 +1,9 @@
-import { Space, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import { Building2, Server, CreditCard, ArrowRight } from 'lucide-react'
 import SiteAdminSidebar from '../../components/siteadmin/sidebar.jsx'
 import AppShell from '../../components/layout/AppShell.jsx'
 import PageHeader from '../../components/common/PageHeader.jsx'
 import StatCard from '../../components/common/StatCard.jsx'
-import {
-  BankOutlined,
-  DashboardOutlined,
-  WalletOutlined,
-  ArrowRightOutlined,
-} from '@ant-design/icons'
-
-const { Text } = Typography
 
 export default function SiteAdminDashboardPage() {
   const navigate = useNavigate()
@@ -23,72 +15,60 @@ export default function SiteAdminDashboardPage() {
         description="Manage companies, billing, and system operations"
       />
 
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 24 }}>
+      <div className="flex flex-wrap gap-4 mb-8">
         <StatCard
-          title="System"
+          title="System Status"
           value="Online"
-          subtitle="All services running"
-          icon={<DashboardOutlined />}
-          color="var(--exim-success)"
+          subtitle="All services running seamlessly"
+          icon={<Server size={22} />}
+          color="#10B981" // emerald-500
+          className="w-full max-w-[320px]"
         />
       </div>
 
-      {/* Quick Actions */}
-      <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--exim-text-primary)', marginBottom: 16 }}>
-        Quick Actions
-      </div>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-        gap: 16,
-      }}>
+      {/* Quick Actions Panel */}
+      <div className="bg-white border border-slate-200 rounded-lg p-6">
+        <div className="text-sm font-semibold uppercase tracking-wider text-slate-500 mb-5">
+          Quick Actions
+        </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {[
-          { key: 'companies', icon: <BankOutlined style={{ fontSize: 22, color: 'var(--exim-primary)' }} />, title: 'Companies', description: 'Create and manage company accounts', path: '/siteadmin/company', color: 'var(--exim-primary-50)' },
-          { key: 'billing', icon: <WalletOutlined style={{ fontSize: 22, color: '#059669' }} />, title: 'Billing', description: 'Manage billing and invoices', path: '/siteadmin/billing', color: 'var(--exim-success-light)' },
+          { 
+            key: 'companies', 
+            icon: <Building2 size={22} className="text-blue-600" />, 
+            title: 'Companies', 
+            description: 'Create and manage company accounts', 
+            path: '/siteadmin/company', 
+            bg: 'bg-blue-50' 
+          },
+          { 
+            key: 'billing', 
+            icon: <CreditCard size={22} className="text-emerald-600" />, 
+            title: 'Billing', 
+            description: 'Manage billing and invoices', 
+            path: '/siteadmin/billing', 
+            bg: 'bg-emerald-50' 
+          },
         ].map((action) => (
           <div
             key={action.key}
             onClick={() => navigate(action.path)}
-            style={{
-              background: 'var(--exim-surface)',
-              border: '1px solid var(--exim-border-light)',
-              borderRadius: 'var(--radius-lg)',
-              padding: 20,
-              cursor: 'pointer',
-              transition: 'all var(--transition-base)',
-              boxShadow: 'var(--shadow-xs)',
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: 16,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = 'var(--shadow-md)'
-              e.currentTarget.style.transform = 'translateY(-2px)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = 'var(--shadow-xs)'
-              e.currentTarget.style.transform = 'translateY(0)'
-            }}
+            className="group bg-slate-50 border border-slate-200 rounded-lg p-5 cursor-pointer transition-colors duration-200 hover:bg-slate-100 hover:border-slate-300 flex items-start gap-4"
           >
-            <div style={{
-              width: 44, height: 44, borderRadius: 'var(--radius-md)',
-              background: action.color, display: 'flex', alignItems: 'center',
-              justifyContent: 'center', flexShrink: 0,
-            }}>
+            <div className={`w-11 h-11 rounded-lg flex items-center justify-center shrink-0 ${action.bg}`}>
               {action.icon}
             </div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{
-                fontSize: 14, fontWeight: 600, color: 'var(--exim-text-primary)', marginBottom: 4,
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              }}>
+            <div className="flex-1 min-w-0">
+              <div className="text-[14px] font-semibold text-slate-800 mb-1 flex items-center justify-between">
                 {action.title}
-                <ArrowRightOutlined style={{ fontSize: 12, color: 'var(--exim-gray-400)' }} />
+                <ArrowRight size={14} className="text-slate-400 group-hover:text-blue-500 transition-colors" />
               </div>
-              <div style={{ fontSize: 13, color: 'var(--exim-text-secondary)' }}>{action.description}</div>
+              <div className="text-[13px] text-slate-500 leading-relaxed">{action.description}</div>
             </div>
           </div>
         ))}
+        </div>
       </div>
     </AppShell>
   )
